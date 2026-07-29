@@ -1,0 +1,224 @@
+{{ 'msc-catalog.css' | asset_url | stylesheet_tag }}
+
+<div
+  id="msc-catalog-{{ block.id }}"
+  class="msc-catalog"
+  data-msc-root
+  data-products-url="/apps/msc/products"
+  data-request-url="/apps/msc/request"
+  data-click-url="/apps/msc/click"
+  data-currency="{{ shop.currency | default: 'MXN' | escape }}"
+  data-whatsapp="{{ block.settings.whatsapp_number | escape }}"
+>
+  <div class="msc-container">
+    <header class="msc-header">
+      <div>
+        <h2 class="msc-title">{{ block.settings.heading | default: 'Productos' | escape }}</h2>
+        {% if block.settings.subheading != blank %}
+          <p class="msc-subtitle">{{ block.settings.subheading | escape }}</p>
+        {% endif %}
+      </div>
+
+      <button type="button" class="msc-list-button" data-msc-open-cart aria-label="Abrir lista de compra">
+        <span aria-hidden="true">🛒</span>
+        <span>{{ block.settings.cart_label | default: 'Lista' | escape }}</span>
+        <span class="msc-list-count" data-msc-cart-count>0</span>
+      </button>
+    </header>
+
+    <div class="msc-status" data-msc-status>Cargando productos...</div>
+    <div class="msc-products-grid" data-msc-products-grid aria-live="polite"></div>
+  </div>
+
+  <div class="msc-overlay" data-msc-product-modal aria-hidden="true" hidden>
+    <button type="button" class="msc-overlay-background" data-msc-close-product aria-label="Cerrar"></button>
+
+    <section class="msc-product-dialog" role="dialog" aria-modal="true" aria-label="Información del producto">
+      <button type="button" class="msc-close-button" data-msc-close-product aria-label="Cerrar">×</button>
+
+      <div class="msc-product-detail">
+        <div class="msc-product-detail-media">
+          <img class="msc-product-detail-image" data-msc-modal-image src="" alt="" width="700" height="700">
+          <div class="msc-product-detail-placeholder" data-msc-modal-placeholder hidden>Sin imagen</div>
+        </div>
+
+        <div class="msc-product-detail-content">
+          <h3 class="msc-product-detail-title" data-msc-modal-title></h3>
+          <div class="msc-product-detail-price" data-msc-modal-price></div>
+          <div class="msc-product-detail-description" data-msc-modal-description></div>
+
+          <div class="msc-quantity-section">
+            <span class="msc-quantity-label">Cantidad</span>
+            <div class="msc-quantity-control">
+              <button type="button" data-msc-modal-minus aria-label="Reducir cantidad">−</button>
+              <span data-msc-modal-quantity>1</span>
+              <button type="button" data-msc-modal-plus aria-label="Aumentar cantidad">+</button>
+            </div>
+          </div>
+
+          <button type="button" class="msc-primary-button" data-msc-add-cart>Agregar a la lista</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="msc-cart-drawer" data-msc-cart-drawer aria-hidden="true" hidden>
+    <button type="button" class="msc-cart-backdrop" data-msc-close-cart aria-label="Cerrar lista"></button>
+
+    <aside class="msc-cart-panel" role="dialog" aria-modal="true" aria-label="Lista de compra">
+      <header class="msc-cart-header">
+        <h3>Lista de compra</h3>
+        <button type="button" class="msc-cart-close" data-msc-close-cart aria-label="Cerrar">×</button>
+      </header>
+
+      <div class="msc-cart-body">
+        <div class="msc-cart-items" data-msc-cart-items></div>
+        <div class="msc-cart-empty" data-msc-cart-empty>Tu lista está vacía.</div>
+      </div>
+
+      <footer class="msc-cart-footer">
+        <div class="msc-cart-total-row">
+          <span>Total</span>
+          <strong data-msc-cart-total>$0.00</strong>
+        </div>
+
+        <button type="button" class="msc-primary-button" data-msc-open-checkout disabled>Continuar</button>
+      </footer>
+    </aside>
+  </div>
+
+  <div class="msc-overlay msc-checkout-overlay" data-msc-checkout-modal aria-hidden="true" hidden>
+    <button type="button" class="msc-overlay-background" data-msc-close-checkout aria-label="Cerrar"></button>
+
+    <section class="msc-checkout-dialog" role="dialog" aria-modal="true" aria-label="Datos del comprador">
+      <button type="button" class="msc-close-button msc-checkout-close" data-msc-close-checkout aria-label="Cerrar formulario">×</button>
+
+      <div class="msc-checkout-inner">
+        <h3 class="msc-checkout-title">Datos del comprador</h3>
+
+        <form class="msc-checkout-form" data-msc-checkout-form>
+          <div class="msc-form-grid">
+            <div class="msc-field">
+              <label for="msc-name-{{ block.id }}">Nombre completo *</label>
+              <input id="msc-name-{{ block.id }}" type="text" name="name" autocomplete="name" required>
+            </div>
+
+            <div class="msc-field">
+              <label for="msc-phone-{{ block.id }}">Teléfono / WhatsApp *</label>
+              <input id="msc-phone-{{ block.id }}" type="tel" name="phone" autocomplete="tel" required>
+            </div>
+
+            <div class="msc-field msc-field-full">
+              <label for="msc-address-{{ block.id }}">Calle y dirección *</label>
+              <input id="msc-address-{{ block.id }}" type="text" name="address" autocomplete="street-address" required>
+            </div>
+
+            <div class="msc-field">
+              <label for="msc-exterior-{{ block.id }}">Número exterior *</label>
+              <input id="msc-exterior-{{ block.id }}" type="text" name="exteriorNumber" required>
+            </div>
+
+            <div class="msc-field">
+              <label for="msc-interior-{{ block.id }}">Número interior</label>
+              <input id="msc-interior-{{ block.id }}" type="text" name="interiorNumber">
+            </div>
+
+            <div class="msc-field">
+              <label for="msc-colonia-{{ block.id }}">Colonia *</label>
+              <input id="msc-colonia-{{ block.id }}" type="text" name="colonia" required>
+            </div>
+
+            <div class="msc-field">
+              <label for="msc-municipality-{{ block.id }}">Alcaldía / Municipio *</label>
+              <input id="msc-municipality-{{ block.id }}" type="text" name="municipality" required>
+            </div>
+
+            <div class="msc-field">
+              <label for="msc-state-{{ block.id }}">Estado *</label>
+              <input id="msc-state-{{ block.id }}" type="text" name="state" value="Ciudad de México" required>
+            </div>
+
+            <div class="msc-field">
+              <label for="msc-postal-{{ block.id }}">Código postal *</label>
+              <input id="msc-postal-{{ block.id }}" type="text" name="postalCode" inputmode="numeric" maxlength="5" required>
+            </div>
+
+            <div class="msc-field">
+              <label for="msc-email-{{ block.id }}">Correo electrónico</label>
+              <input id="msc-email-{{ block.id }}" type="email" name="email" autocomplete="email">
+            </div>
+
+            <div class="msc-field">
+              <label for="msc-time-{{ block.id }}">Horario preferido</label>
+              <select id="msc-time-{{ block.id }}" name="deliveryTime">
+                <option value="">Seleccionar</option>
+                <option value="Mañana">Mañana</option>
+                <option value="Tarde">Tarde</option>
+                <option value="Noche">Noche</option>
+                <option value="Cualquier horario">Cualquier horario</option>
+              </select>
+            </div>
+
+            <div class="msc-field msc-field-full">
+              <label for="msc-reference-{{ block.id }}">Referencias</label>
+              <textarea id="msc-reference-{{ block.id }}" name="reference" rows="1" placeholder="Entre qué calles, color del edificio..."></textarea>
+            </div>
+
+            <div class="msc-field msc-field-full">
+              <label for="msc-comments-{{ block.id }}">Comentarios</label>
+              <textarea id="msc-comments-{{ block.id }}" name="comments" rows="1"></textarea>
+            </div>
+          </div>
+
+          <section class="msc-order-summary">
+            <h4>Resumen del pedido</h4>
+            <div data-msc-checkout-items></div>
+
+            <div class="msc-order-total">
+              <strong>Total</strong>
+              <strong data-msc-checkout-total>$0.00</strong>
+            </div>
+          </section>
+
+          <button type="submit" class="msc-whatsapp-button" data-msc-submit>Enviar pedido por WhatsApp</button>
+          <p class="msc-form-message" data-msc-message></p>
+        </form>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="{{ 'msc-catalog.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "MSC Catalog",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Título",
+      "default": "Productos"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subtítulo",
+      "default": "Compra fácilmente por WhatsApp"
+    },
+    {
+      "type": "text",
+      "id": "cart_label",
+      "label": "Texto de la lista",
+      "default": "Lista"
+    },
+    {
+      "type": "text",
+      "id": "whatsapp_number",
+      "label": "Número de WhatsApp",
+      "info": "Ejemplo: 525512345678"
+    }
+  ]
+}
+{% endschema %}
