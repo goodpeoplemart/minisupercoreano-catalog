@@ -742,19 +742,26 @@ body.msc-lock { overflow: hidden !important; }
   .msc-subtitle { font-size: 13px; }
 
   .msc-list-button {
-    min-height: 41px;
+    min-height: 44px;
     padding: 8px 12px;
     font-size: 12px;
   }
 
   .msc-products-grid {
     grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: 13px;
+    gap: 12px;
   }
 
+  .msc-product-image { padding: 10px; }
+
   .msc-product-info { padding: 12px; }
-  .msc-product-name { min-height: 38px; font-size: 13px; }
-  .msc-product-price { font-size: 15px; }
+  .msc-product-name { min-height: 38px; font-size: 14px; line-height: 1.35; }
+  .msc-product-price { font-size: 16px; }
+
+  .msc-quantity-control button {
+    width: 44px;
+    height: 44px;
+  }
 
   .msc-overlay { padding: 9px; }
 
@@ -771,6 +778,17 @@ body.msc-lock { overflow: hidden !important; }
 
   .msc-product-detail-media { min-height: 245px; }
   .msc-product-detail-image { max-height: 310px; }
+
+  .msc-cart-quantity button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .msc-cart-remove {
+    min-height: 40px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
 
   .msc-cart-panel {
     top: 0;
