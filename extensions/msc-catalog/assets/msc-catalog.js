@@ -1,6 +1,28 @@
 (() => {
   "use strict";
 
+  /*
+   * TABLE OF CONTENTS
+   * - Initialization
+   * - Configuration and DOM references
+   * - Application state
+   * - Event listeners
+   * - API requests
+   * - Product normalization
+   * - Utility functions
+   * - Product rendering
+   * - Product modal
+   * - Quantity controls
+   * - Cart state
+   * - Cart rendering
+   * - Cart interactions
+   * - Checkout rendering
+   * - WhatsApp order
+   * - Click tracking
+   * - Layer UI
+   * - Loading and error handling
+   */
+
   const ready = (fn) => {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", fn, { once: true });
@@ -9,6 +31,9 @@
     }
   };
 
+  /* ==================================================
+     INITIALIZATION
+     ================================================== */
   ready(() => {
     document.querySelectorAll("[data-msc-root]").forEach((root) => {
       if (root.dataset.mscInitialized === "true") return;
@@ -18,6 +43,9 @@
   });
 
   function initCatalog(root) {
+    /* ==================================================
+       CONFIGURATION AND DOM REFERENCES
+       ================================================== */
     const productsUrl = root.dataset.productsUrl || "/apps/msc/products";
     const requestUrl = root.dataset.requestUrl || "/apps/msc/request";
     const clickUrl = root.dataset.clickUrl || "/apps/msc/click";
@@ -56,6 +84,9 @@
       message: root.querySelector("[data-msc-message]")
     };
 
+    /* ==================================================
+       APPLICATION STATE
+       ================================================== */
     const state = {
       products: [],
       cart: [],
@@ -66,6 +97,9 @@
     bindEvents();
     loadProducts();
 
+    /* ==================================================
+       EVENT LISTENERS
+       ================================================== */
     function bindEvents() {
       el.openCart?.addEventListener("click", openCart);
       el.closeCart.forEach((button) => button.addEventListener("click", closeCart));
@@ -125,6 +159,9 @@
       });
     }
 
+    /* ==================================================
+       API REQUESTS
+       ================================================== */
     async function loadProducts() {
       setStatus("Cargando productos...", false);
 
@@ -165,6 +202,9 @@
       }
     }
 
+    /* ==================================================
+       PRODUCT NORMALIZATION
+       ================================================== */
     function extractProducts(payload) {
       if (Array.isArray(payload)) return payload;
       if (Array.isArray(payload?.products)) return payload.products;
@@ -236,6 +276,9 @@
       };
     }
 
+    /* ==================================================
+       UTILITY FUNCTIONS
+       ================================================== */
     function normalizeImageUrl(value) {
       const url = String(value || "").trim();
       if (!url) return "";
@@ -252,6 +295,9 @@
       return Number.isFinite(parsed) ? parsed : 0;
     }
 
+    /* ==================================================
+       PRODUCT RENDERING
+       ================================================== */
     function renderProducts() {
       el.grid.innerHTML = "";
       const fragment = document.createDocumentFragment();
@@ -317,6 +363,9 @@
       el.grid.appendChild(fragment);
     }
 
+    /* ==================================================
+       PRODUCT MODAL
+       ================================================== */
     function openProduct(product) {
       state.selectedProduct = product;
       state.selectedQuantity = 1;
@@ -352,10 +401,16 @@
       state.selectedQuantity = 1;
     }
 
+    /* ==================================================
+       QUANTITY CONTROLS
+       ================================================== */
     function updateModalQuantity() {
       if (el.modalQuantity) el.modalQuantity.textContent = String(state.selectedQuantity);
     }
 
+    /* ==================================================
+       CART STATE
+       ================================================== */
     function addToCart(product, quantity) {
       const existing = state.cart.find((item) => item.product.id === product.id);
       if (existing) existing.quantity += quantity;
@@ -363,6 +418,9 @@
       renderCart();
     }
 
+    /* ==================================================
+       CART RENDERING
+       ================================================== */
     function renderCart() {
       el.cartItems.innerHTML = "";
       const totalQuantity = state.cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -455,6 +513,9 @@
       });
     }
 
+    /* ==================================================
+       CART INTERACTIONS
+       ================================================== */
     function openCart() {
       renderCart();
       showLayer(el.cartDrawer);
@@ -464,6 +525,9 @@
       hideLayer(el.cartDrawer);
     }
 
+    /* ==================================================
+       CHECKOUT RENDERING
+       ================================================== */
     function renderCheckout() {
       el.checkoutItems.innerHTML = "";
 
@@ -489,6 +553,9 @@
       setMessage("");
     }
 
+    /* ==================================================
+       WHATSAPP ORDER
+       ================================================== */
     async function submitOrder(event) {
       event.preventDefault();
 
@@ -588,6 +655,9 @@
       return `https://wa.me/${phone}?text=${encodeURIComponent(lines.join("\n"))}`;
     }
 
+    /* ==================================================
+       CLICK TRACKING
+       ================================================== */
     async function sendClick(product) {
       if (!clickUrl) return;
       await fetch(clickUrl, {
@@ -602,6 +672,9 @@
       });
     }
 
+    /* ==================================================
+       LAYER UI
+       ================================================== */
     function showLayer(element) {
       if (!element) return;
       element.hidden = false;
@@ -625,6 +698,9 @@
       }
     }
 
+    /* ==================================================
+       UTILITY FUNCTIONS
+       ================================================== */
     function getCartTotal() {
       return state.cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
     }
@@ -642,6 +718,9 @@
       }
     }
 
+    /* ==================================================
+       LOADING AND ERROR HANDLING
+       ================================================== */
     function setStatus(message, isError) {
       el.status.hidden = false;
       el.status.textContent = message;
@@ -667,6 +746,9 @@
     }
   }
 
+  /* ==================================================
+     UTILITY FUNCTIONS
+     ================================================== */
   function stripHtml(value) {
     const node = document.createElement("div");
     node.innerHTML = String(value || "");

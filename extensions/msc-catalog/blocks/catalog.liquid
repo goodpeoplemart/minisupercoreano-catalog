@@ -1,5 +1,29 @@
+{%- comment -%}
+  TABLE OF CONTENTS
+  - Asset loading (CSS)
+  - Catalog root container and App Proxy configuration
+  - Header
+  - Loading and status state
+  - Product grid
+  - Product detail modal
+  - Cart drawer
+  - Checkout modal
+  - Asset loading (JavaScript)
+  - Liquid schema
+{%- endcomment -%}
+
+{%- comment -%}
+==================================================
+ASSET LOADING (CSS)
+==================================================
+{%- endcomment -%}
 {{ 'msc-catalog.css' | asset_url | stylesheet_tag }}
 
+{%- comment -%}
+==================================================
+CATALOG ROOT CONTAINER AND APP PROXY CONFIGURATION
+==================================================
+{%- endcomment -%}
 <div
   id="msc-catalog-{{ block.id }}"
   class="msc-catalog"
@@ -11,6 +35,11 @@
   data-whatsapp="{{ block.settings.whatsapp_number | escape }}"
 >
   <div class="msc-container">
+    {%- comment -%}
+    ==================================================
+    HEADER
+    ==================================================
+    {%- endcomment -%}
     <header class="msc-header">
       <div>
         <h2 class="msc-title">{{ block.settings.heading | default: 'Productos' | escape }}</h2>
@@ -26,10 +55,25 @@
       </button>
     </header>
 
+    {%- comment -%}
+    ==================================================
+    LOADING AND STATUS STATE
+    ==================================================
+    {%- endcomment -%}
     <div class="msc-status" data-msc-status>Cargando productos...</div>
+    {%- comment -%}
+    ==================================================
+    PRODUCT GRID
+    ==================================================
+    {%- endcomment -%}
     <div class="msc-products-grid" data-msc-products-grid aria-live="polite"></div>
   </div>
 
+  {%- comment -%}
+  ==================================================
+  PRODUCT DETAIL MODAL
+  ==================================================
+  {%- endcomment -%}
   <div class="msc-overlay" data-msc-product-modal aria-hidden="true" hidden>
     <button type="button" class="msc-overlay-background" data-msc-close-product aria-label="Cerrar"></button>
 
@@ -62,6 +106,11 @@
     </section>
   </div>
 
+  {%- comment -%}
+  ==================================================
+  CART DRAWER
+  ==================================================
+  {%- endcomment -%}
   <div class="msc-cart-drawer" data-msc-cart-drawer aria-hidden="true" hidden>
     <button type="button" class="msc-cart-backdrop" data-msc-close-cart aria-label="Cerrar lista"></button>
 
@@ -87,6 +136,11 @@
     </aside>
   </div>
 
+  {%- comment -%}
+  ==================================================
+  CHECKOUT MODAL
+  ==================================================
+  {%- endcomment -%}
   <div class="msc-overlay msc-checkout-overlay" data-msc-checkout-modal aria-hidden="true" hidden>
     <button type="button" class="msc-overlay-background" data-msc-close-checkout aria-label="Cerrar"></button>
 
@@ -188,8 +242,18 @@
   </div>
 </div>
 
+{%- comment -%}
+==================================================
+ASSET LOADING (JAVASCRIPT)
+==================================================
+{%- endcomment -%}
 <script src="{{ 'msc-catalog.js' | asset_url }}" defer></script>
 
+{%- comment -%}
+==================================================
+LIQUID SCHEMA
+==================================================
+{%- endcomment -%}
 {% schema %}
 {
   "name": "MSC Catalog",

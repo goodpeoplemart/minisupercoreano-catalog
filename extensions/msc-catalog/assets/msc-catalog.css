@@ -1,3 +1,30 @@
+/*
+ * TABLE OF CONTENTS
+ * - Variables and base
+ * - Runtime state classes
+ * - Catalog layout
+ * - Header
+ * - Loading and error states
+ * - Product grid
+ * - Product card
+ * - Product image
+ * - Price
+ * - Overlay and product detail modal
+ * - Quantity controls
+ * - Buttons
+ * - Cart drawer
+ * - Cart item
+ * - Cart summary
+ * - Checkout modal
+ * - Checkout form fields
+ * - Order summary
+ * - WhatsApp button and form message
+ * - Responsive rules
+ */
+
+/* ==================================================
+   VARIABLES AND BASE
+   ================================================== */
 .msc-catalog {
   --msc-text: #222;
   --msc-muted: #6b6b6b;
@@ -30,9 +57,15 @@
 .msc-catalog button { cursor: pointer; }
 .msc-catalog img { display: block; max-width: 100%; }
 
+/* ==================================================
+   RUNTIME STATE CLASSES
+   ================================================== */
 html.msc-lock,
 body.msc-lock { overflow: hidden !important; }
 
+/* ==================================================
+   CATALOG LAYOUT
+   ================================================== */
 .msc-container {
   display: flex;
   flex: 1 1 auto;
@@ -44,6 +77,9 @@ body.msc-lock { overflow: hidden !important; }
   padding: 38px 0 60px;
 }
 
+/* ==================================================
+   HEADER
+   ================================================== */
 .msc-header {
   display: flex;
   align-items: flex-start;
@@ -94,6 +130,9 @@ body.msc-lock { overflow: hidden !important; }
   font-weight: 700;
 }
 
+/* ==================================================
+   LOADING AND ERROR STATES
+   ================================================== */
 .msc-status {
   padding: 30px 10px;
   color: var(--msc-muted);
@@ -102,6 +141,9 @@ body.msc-lock { overflow: hidden !important; }
 
 .msc-status.is-error { color: var(--msc-danger); }
 
+/* ==================================================
+   PRODUCT GRID
+   ================================================== */
 .msc-products-grid {
   display: grid;
   flex: 1 1 auto;
@@ -111,6 +153,9 @@ body.msc-lock { overflow: hidden !important; }
   width: 100%;
 }
 
+/* ==================================================
+   PRODUCT CARD
+   ================================================== */
 .msc-product-card {
   overflow: hidden;
   min-width: 0;
@@ -135,6 +180,9 @@ body.msc-lock { overflow: hidden !important; }
   text-align: left;
 }
 
+/* ==================================================
+   PRODUCT IMAGE
+   ================================================== */
 .msc-product-media {
   display: flex;
   align-items: center;
@@ -158,6 +206,9 @@ body.msc-lock { overflow: hidden !important; }
   font-size: 13px;
 }
 
+/* ==================================================
+   PRICE
+   ================================================== */
 .msc-product-info { padding: 15px; }
 
 .msc-product-name {
@@ -175,6 +226,9 @@ body.msc-lock { overflow: hidden !important; }
   font-weight: 700;
 }
 
+/* ==================================================
+   OVERLAY AND PRODUCT DETAIL MODAL
+   ================================================== */
 .msc-overlay {
   position: fixed !important;
   inset: 0 !important;
@@ -283,6 +337,9 @@ body.msc-lock { overflow: hidden !important; }
   line-height: 1.6;
 }
 
+/* ==================================================
+   QUANTITY CONTROLS
+   ================================================== */
 .msc-quantity-section {
   display: flex;
   align-items: center;
@@ -320,6 +377,9 @@ body.msc-lock { overflow: hidden !important; }
   font-weight: 700;
 }
 
+/* ==================================================
+   BUTTONS
+   ================================================== */
 .msc-primary-button {
   width: 100%;
   min-height: 48px;
@@ -333,6 +393,9 @@ body.msc-lock { overflow: hidden !important; }
 
 .msc-product-detail-content > .msc-primary-button { margin-top: 23px; }
 
+/* ==================================================
+   CART DRAWER
+   ================================================== */
 .msc-cart-drawer {
   position: fixed !important;
   inset: 0 !important;
@@ -394,6 +457,9 @@ body.msc-lock { overflow: hidden !important; }
   text-align: center;
 }
 
+/* ==================================================
+   CART ITEM
+   ================================================== */
 .msc-cart-item {
   display: grid;
   grid-template-columns: 72px minmax(0,1fr);
@@ -466,6 +532,9 @@ body.msc-lock { overflow: hidden !important; }
   font-size: 12px;
 }
 
+/* ==================================================
+   CART SUMMARY
+   ================================================== */
 .msc-cart-footer {
   flex: 0 0 auto;
   padding: 18px 20px 21px;
@@ -481,6 +550,9 @@ body.msc-lock { overflow: hidden !important; }
   font-size: 17px;
 }
 
+/* ==================================================
+   CHECKOUT MODAL
+   ================================================== */
 /* 구매자 정보창: 항상 화면 안에 표시하고 내부를 강제로 세로 스크롤 */
 .msc-checkout-overlay {
   align-items: center;
