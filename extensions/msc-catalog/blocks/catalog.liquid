@@ -19,6 +19,55 @@ ASSET LOADING (CSS)
 {%- endcomment -%}
 {{ 'msc-catalog.css' | asset_url | stylesheet_tag }}
 
+<style>
+  /* Hide theme announcement bar on MSC catalog pages */
+  body:has(.msc-catalog) .announcement-bar-section,
+  body:has(.msc-catalog) .shopify-section-announcement-bar,
+  body:has(.msc-catalog) section[id*="announcement"],
+  body:has(.msc-catalog) .announcement-bar {
+    display: none !important;
+  }
+
+  /* Remove extra top space from theme layout around the catalog block */
+  body:has(.msc-catalog) #MainContent,
+  body:has(.msc-catalog) main#MainContent,
+  body:has(.msc-catalog) .shopify-section:has([data-msc-root]),
+  body:has(.msc-catalog) .shopify-section:has(.msc-catalog) {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+  }
+
+  /* Hide theme main menu on MSC catalog pages; keep store name/logo visible */
+  body:has(.msc-catalog) .header__inline-menu,
+  body:has(.msc-catalog) nav.header__inline-menu,
+  body:has(.msc-catalog) .header__icon--menu,
+  body:has(.msc-catalog) header-drawer,
+  body:has(.msc-catalog) .menu-drawer-container,
+  body:has(.msc-catalog) .site-nav,
+  body:has(.msc-catalog) .site-header__nav,
+  body:has(.msc-catalog) .site-header__links {
+    display: none !important;
+  }
+
+  body:has(.msc-catalog) .header {
+    grid-template-areas: "heading icons" !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    column-gap: 1.5rem;
+    padding-block: 0.75rem !important;
+  }
+
+  body:has(.msc-catalog) .header__heading,
+  body:has(.msc-catalog) .header__heading-link {
+    justify-self: start;
+  }
+
+  @media screen and (max-width: 749px) {
+    body:has(.msc-catalog) .header {
+      padding-block: 0.65rem !important;
+    }
+  }
+</style>
+
 {%- comment -%}
 ==================================================
 CATALOG ROOT CONTAINER AND APP PROXY CONFIGURATION
@@ -29,10 +78,11 @@ CATALOG ROOT CONTAINER AND APP PROXY CONFIGURATION
   class="msc-catalog"
   data-msc-root
   data-products-url="/apps/msc/products"
-  data-request-url="/apps/msc/request"
+  data-order-url="/apps/msc/order"
+  data-request-url="/apps/msc/order"
   data-click-url="/apps/msc/click"
   data-currency="{{ shop.currency | default: 'MXN' | escape }}"
-  data-whatsapp="{{ block.settings.whatsapp_number | escape }}"
+  data-seller-whatsapp="{{ block.settings.whatsapp_number | default: '525633244119' | escape }}"
 >
   <div class="msc-container">
     {%- comment -%}
@@ -111,21 +161,21 @@ CATALOG ROOT CONTAINER AND APP PROXY CONFIGURATION
   CART DRAWER
   ==================================================
   {%- endcomment -%}
-  <div class="msc-cart-drawer" data-msc-cart-drawer aria-hidden="true" hidden>
-    <button type="button" class="msc-cart-backdrop" data-msc-close-cart aria-label="Cerrar lista"></button>
+  <div class="msc-cart-drawer msc-modal-overlay" data-msc-cart-drawer aria-hidden="true" hidden>
+    <button type="button" class="msc-modal-backdrop msc-cart-backdrop" data-msc-close-cart aria-label="Cerrar lista"></button>
 
-    <aside class="msc-cart-panel" role="dialog" aria-modal="true" aria-label="Lista de compra">
-      <header class="msc-cart-header">
+    <aside class="msc-cart-panel msc-modal-window" role="dialog" aria-modal="true" aria-label="Lista de compra">
+      <header class="msc-modal-header msc-cart-header">
         <h3>Lista de compra</h3>
-        <button type="button" class="msc-cart-close" data-msc-close-cart aria-label="Cerrar">×</button>
+        <button type="button" class="msc-modal-close msc-cart-close" data-msc-close-cart aria-label="Cerrar">×</button>
       </header>
 
-      <div class="msc-cart-body">
+      <div class="msc-modal-body msc-cart-body">
         <div class="msc-cart-items" data-msc-cart-items></div>
         <div class="msc-cart-empty" data-msc-cart-empty>Tu lista está vacía.</div>
       </div>
 
-      <footer class="msc-cart-footer">
+      <footer class="msc-modal-footer msc-cart-footer">
         <div class="msc-cart-total-row">
           <span>Total</span>
           <strong data-msc-cart-total>$0.00</strong>
@@ -141,15 +191,16 @@ CATALOG ROOT CONTAINER AND APP PROXY CONFIGURATION
   CHECKOUT MODAL
   ==================================================
   {%- endcomment -%}
-  <div class="msc-overlay msc-checkout-overlay" data-msc-checkout-modal aria-hidden="true" hidden>
-    <button type="button" class="msc-overlay-background" data-msc-close-checkout aria-label="Cerrar"></button>
+  <div class="msc-checkout-overlay msc-modal-overlay" data-msc-checkout-modal aria-hidden="true" hidden>
+    <button type="button" class="msc-modal-backdrop" data-msc-close-checkout aria-label="Cerrar"></button>
 
-    <section class="msc-checkout-dialog" role="dialog" aria-modal="true" aria-label="Datos del comprador">
-      <button type="button" class="msc-close-button msc-checkout-close" data-msc-close-checkout aria-label="Cerrar formulario">×</button>
+    <section class="msc-checkout-dialog msc-modal-window" role="dialog" aria-modal="true" aria-label="Datos del comprador">
+      <header class="msc-modal-header msc-checkout-header">
+        <h3>Datos del comprador</h3>
+        <button type="button" class="msc-modal-close msc-checkout-close" data-msc-close-checkout aria-label="Cerrar formulario">×</button>
+      </header>
 
-      <div class="msc-checkout-inner">
-        <h3 class="msc-checkout-title">Datos del comprador</h3>
-
+      <div class="msc-modal-body msc-checkout-inner">
         <form class="msc-checkout-form" data-msc-checkout-form>
           <div class="msc-form-grid">
             <div class="msc-field">
@@ -163,8 +214,16 @@ CATALOG ROOT CONTAINER AND APP PROXY CONFIGURATION
             </div>
 
             <div class="msc-field msc-field-full">
-              <label for="msc-address-{{ block.id }}">Calle y dirección *</label>
-              <input id="msc-address-{{ block.id }}" type="text" name="address" autocomplete="street-address" required>
+              <label for="msc-address-{{ block.id }}">Dirección de entrega *</label>
+              <input
+                id="msc-address-{{ block.id }}"
+                type="text"
+                name="address"
+                autocomplete="street-address"
+                placeholder="Calle y número"
+                required
+              >
+              <p class="msc-field-hint">Esta es la dirección donde recibirá los productos de su pedido.</p>
             </div>
 
             <div class="msc-field">
@@ -178,55 +237,68 @@ CATALOG ROOT CONTAINER AND APP PROXY CONFIGURATION
             </div>
 
             <div class="msc-field">
+              <label for="msc-postal-{{ block.id }}">Código Postal *</label>
+              <input
+                id="msc-postal-{{ block.id }}"
+                type="text"
+                name="postalCode"
+                inputmode="numeric"
+                maxlength="5"
+                autocomplete="postal-code"
+                required
+              >
+            </div>
+
+            <div class="msc-field">
               <label for="msc-colonia-{{ block.id }}">Colonia *</label>
-              <input id="msc-colonia-{{ block.id }}" type="text" name="colonia" required>
+              <input
+                id="msc-colonia-{{ block.id }}"
+                type="text"
+                name="colonia"
+                required
+              >
             </div>
 
             <div class="msc-field">
               <label for="msc-municipality-{{ block.id }}">Alcaldía / Municipio *</label>
-              <input id="msc-municipality-{{ block.id }}" type="text" name="municipality" required>
+              <input
+                id="msc-municipality-{{ block.id }}"
+                type="text"
+                name="municipality"
+                required
+              >
             </div>
 
             <div class="msc-field">
               <label for="msc-state-{{ block.id }}">Estado *</label>
-              <input id="msc-state-{{ block.id }}" type="text" name="state" value="Ciudad de México" required>
+              <input
+                id="msc-state-{{ block.id }}"
+                type="text"
+                name="state"
+                value="Ciudad de México"
+                required
+              >
             </div>
 
-            <div class="msc-field">
-              <label for="msc-postal-{{ block.id }}">Código postal *</label>
-              <input id="msc-postal-{{ block.id }}" type="text" name="postalCode" inputmode="numeric" maxlength="5" required>
-            </div>
-
-            <div class="msc-field">
+            <div class="msc-field msc-field-full">
               <label for="msc-email-{{ block.id }}">Correo electrónico</label>
               <input id="msc-email-{{ block.id }}" type="email" name="email" autocomplete="email">
             </div>
 
-            <div class="msc-field">
-              <label for="msc-time-{{ block.id }}">Horario preferido</label>
-              <select id="msc-time-{{ block.id }}" name="deliveryTime">
-                <option value="">Seleccionar</option>
-                <option value="Mañana">Mañana</option>
-                <option value="Tarde">Tarde</option>
-                <option value="Noche">Noche</option>
-                <option value="Cualquier horario">Cualquier horario</option>
-              </select>
-            </div>
-
             <div class="msc-field msc-field-full">
               <label for="msc-reference-{{ block.id }}">Referencias</label>
-              <textarea id="msc-reference-{{ block.id }}" name="reference" rows="1" placeholder="Entre qué calles, color del edificio..."></textarea>
-            </div>
-
-            <div class="msc-field msc-field-full">
-              <label for="msc-comments-{{ block.id }}">Comentarios</label>
-              <textarea id="msc-comments-{{ block.id }}" name="comments" rows="1"></textarea>
+              <textarea
+                id="msc-reference-{{ block.id }}"
+                name="reference"
+                rows="2"
+                placeholder="Entre qué calles, color del edificio, puntos de referencia..."
+              ></textarea>
             </div>
           </div>
 
-          <section class="msc-order-summary">
-            <h4>Resumen del pedido</h4>
-            <div data-msc-checkout-items></div>
+          <section class="msc-order-summary msc-order-summary--checkout">
+            <h4 class="msc-order-summary-title">Resumen del pedido</h4>
+            <div class="msc-order-summary-items" data-msc-checkout-items aria-hidden="true"></div>
 
             <div class="msc-order-total">
               <strong>Total</strong>
@@ -234,8 +306,21 @@ CATALOG ROOT CONTAINER AND APP PROXY CONFIGURATION
             </div>
           </section>
 
-          <button type="submit" class="msc-whatsapp-button" data-msc-submit>Enviar pedido por WhatsApp</button>
+          <button type="submit" class="msc-submit-button" data-msc-submit>Enviar pedido</button>
           <p class="msc-form-message" data-msc-message></p>
+
+          <button type="button" class="msc-whatsapp-button" data-msc-whatsapp-info>
+            Enviar información por WhatsApp
+          </button>
+
+          <button
+            type="button"
+            class="msc-dev-whatsapp-test"
+            data-msc-dev-whatsapp-test
+            hidden
+          >
+            Probar mensaje de WhatsApp
+          </button>
         </form>
       </div>
     </section>
@@ -280,8 +365,9 @@ LIQUID SCHEMA
     {
       "type": "text",
       "id": "whatsapp_number",
-      "label": "Número de WhatsApp",
-      "info": "Ejemplo: 525512345678"
+      "label": "WhatsApp del vendedor",
+      "default": "525633244119",
+      "info": "Solo dígitos, sin +, espacios ni guiones. Ejemplo: 525633244119"
     }
   ]
 }

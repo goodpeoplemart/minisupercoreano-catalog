@@ -1,82 +1,87 @@
-import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
+import { jsonResponse } from "../lib/msc.server";
+
+const MSC_CATALOG_PRODUCTS = `#graphql
+  query MscCatalogProducts {
+    products(
+      first: 100
+      query: "status:active"
+      sortKey: UPDATED_AT
+      reverse: true
+    ) {
+      nodes {
+        id
+        title
+        descriptionHtml
+
+        featuredImage {
+          url
+          altText
+        }
+
+        promotion: metafield(
+          namespace: "custom"
+          key: "promotion"
+        ) {
+          value
+        }
+
+        clicks: metafield(
+          namespace: "custom"
+          key: "catalog_clicks"
+        ) {
+          value
+        }
+
+        variants(first: 1) {
+          nodes {
+            id
+            availableForSale
+            price
+            compareAtPrice
+          }
+        }
+      }
+    }
+
+    shop {
+      currencyCode
+    }
+  }
+`;
 
 export async function loader({ request }) {
+  console.log("[MSC products] loader started");
+
   try {
-    const { admin } = await authenticate.public.appProxy(request);
+    const context = await authenticate.public.appProxy(request);
+    const { admin } = context;
+
+    console.log("[MSC products] app proxy authenticated", {
+      hasAdmin: Boolean(admin),
+      hasSession: Boolean(context.session),
+    });
 
     if (!admin) {
-      return json(
+      console.error("[MSC products] admin session missing");
+      return jsonResponse(
         {
           ok: false,
           error:
             "No se pudo autenticar la tienda. Verifique que la aplicación esté instalada.",
         },
-        {
-          status: 401,
-          headers: {
-            "Cache-Control": "no-store",
-          },
-        },
+        401,
       );
     }
 
-    const response = await admin.graphql(`
-      #graphql
-      query MscCatalogProducts {
-        products(
-          first: 100
-          query: "status:active"
-          sortKey: UPDATED_AT
-          reverse: true
-        ) {
-          nodes {
-            id
-            title
-            descriptionHtml
-
-            featuredImage {
-              url
-              altText
-            }
-
-            promotion: metafield(
-              namespace: "custom"
-              key: "promotion"
-            ) {
-              value
-            }
-
-            clicks: metafield(
-              namespace: "custom"
-              key: "catalog_clicks"
-            ) {
-              value
-            }
-
-            variants(first: 1) {
-              nodes {
-                id
-                availableForSale
-                price
-                compareAtPrice
-              }
-            }
-          }
-        }
-
-        shop {
-          currencyCode
-        }
-      }
-    `);
-
+    console.log("[MSC products] running GraphQL query MscCatalogProducts");
+    const response = await admin.graphql(MSC_CATALOG_PRODUCTS);
     const result = await response.json();
 
     if (Array.isArray(result.errors) && result.errors.length > 0) {
-      console.error("MSC product GraphQL errors:", result.errors);
+      console.error("[MSC products] GraphQL errors:", result.errors);
 
-      return json(
+      return jsonResponse(
         {
           ok: false,
           error: "Shopify rechazó la consulta de productos.",
@@ -84,31 +89,21 @@ export async function loader({ request }) {
             message: error.message,
           })),
         },
-        {
-          status: 502,
-          headers: {
-            "Cache-Control": "no-store",
-          },
-        },
+        502,
       );
     }
 
     const data = result?.data;
 
     if (!data?.products?.nodes) {
-      console.error("MSC invalid GraphQL response:", result);
+      console.error("[MSC products] invalid GraphQL response:", result);
 
-      return json(
+      return jsonResponse(
         {
           ok: false,
           error: "Shopify devolvió una respuesta incompleta.",
         },
-        {
-          status: 502,
-          headers: {
-            "Cache-Control": "no-store",
-          },
-        },
+        502,
       );
     }
 
@@ -128,33 +123,19 @@ export async function loader({ request }) {
           title: product.title,
           descriptionHtml: product.descriptionHtml || "",
           image: product.featuredImage?.url || "",
-          imageAlt:
-            product.featuredImage?.altText ||
-            product.title,
+          imageAlt: product.featuredImage?.altText || product.title,
           price: Number(variant.price || 0),
-          compareAtPrice: Number(
-            variant.compareAtPrice || 0,
-          ),
+          compareAtPrice: Number(variant.compareAtPrice || 0),
           currency: currencyCode,
-          promotion:
-            product.promotion?.value === "true",
-          clicks: Number(
-            product.clicks?.value || 0,
-          ),
-          availableForSale: Boolean(
-            variant.availableForSale,
-          ),
+          promotion: product.promotion?.value === "true",
+          clicks: Number(product.clicks?.value || 0),
+          availableForSale: Boolean(variant.availableForSale),
         };
       })
-      .filter(Boolean)
-      .filter(
-        (product) => product.availableForSale,
-      );
+      .filter(Boolean);
 
     products.sort((a, b) => {
-      const promotionOrder =
-        Number(b.promotion) -
-        Number(a.promotion);
+      const promotionOrder = Number(b.promotion) - Number(a.promotion);
 
       if (promotionOrder !== 0) {
         return promotionOrder;
@@ -163,26 +144,43 @@ export async function loader({ request }) {
       return b.clicks - a.clicks;
     });
 
-    return json(
+    console.log("[MSC products] returning products", {
+      count: products.length,
+      currency: currencyCode,
+    });
+
+    return jsonResponse(
       {
         ok: true,
         products,
       },
-      {
-        status: 200,
-        headers: {
-          "Cache-Control":
-            "no-store, no-cache, must-revalidate",
-        },
-      },
+      200,
     );
   } catch (error) {
-    console.error(
-      "MSC products route error:",
-      error,
-    );
+    console.error("[MSC products] loader error:", error);
 
-    return json(
+    if (error instanceof Response) {
+      let body = "";
+
+      try {
+        body = await error.clone().text();
+      } catch (bodyError) {
+        console.error("No se pudo leer el cuerpo del error:", bodyError);
+      }
+
+      console.error("MSC thrown response status:", error.status, body);
+
+      return jsonResponse(
+        {
+          ok: false,
+          error: `Shopify devolvió un error ${error.status}.`,
+          details: body || error.statusText,
+        },
+        error.status || 500,
+      );
+    }
+
+    return jsonResponse(
       {
         ok: false,
         error:
@@ -190,12 +188,7 @@ export async function loader({ request }) {
             ? error.message
             : "No se pudieron cargar los productos.",
       },
-      {
-        status: 500,
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      },
+      500,
     );
   }
 }

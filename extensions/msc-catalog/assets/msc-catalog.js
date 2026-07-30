@@ -17,7 +17,7 @@
    * - Cart rendering
    * - Cart interactions
    * - Checkout rendering
-   * - WhatsApp order
+   * - Order submission
    * - Click tracking
    * - Layer UI
    * - Loading and error handling
@@ -37,20 +37,171 @@
   ready(() => {
     document.querySelectorAll("[data-msc-root]").forEach((root) => {
       if (root.dataset.mscInitialized === "true") return;
-      root.dataset.mscInitialized = "true";
-      initCatalog(root);
+
+      try {
+        root.dataset.mscInitialized = "true";
+        initCatalog(root);
+      } catch (error) {
+        console.error("[MSC catalog] initCatalog failed:", error);
+        const status = root.querySelector("[data-msc-status]");
+        if (status) {
+          status.hidden = false;
+          status.textContent = "No se pudieron cargar los productos.";
+          status.classList.add("is-error");
+        }
+      }
     });
   });
+
+  const DEFAULT_SELLER_WHATSAPP = "525633244119";
+  const WHATSAPP_LABEL_BEFORE = "Enviar información por WhatsApp";
+  const WHATSAPP_LABEL_AFTER = "Enviar pedido por WhatsApp";
+
+  function safePrice(value) {
+    const amount = Number(value);
+    return Number.isFinite(amount) && amount >= 0 ? amount : 0;
+  }
+
+  function formatWhatsAppMoney(amount) {
+    const value = safePrice(amount);
+
+    try {
+      return new Intl.NumberFormat("es-MX", {
+        style: "currency",
+        currency: "MXN",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(value);
+    } catch {
+      return `$${value.toFixed(2)}`;
+    }
+  }
+
+  function buildBuyerStreet(buyer = {}) {
+    return [
+      buyer.address,
+      buyer.exteriorNumber ? `No. ${buyer.exteriorNumber}` : "",
+      buyer.interiorNumber ? `Int. ${buyer.interiorNumber}` : ""
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+  }
+
+  function buildWhatsAppOrderMessage(order) {
+    if (!order) return "";
+
+    const buyer = order.buyer || {};
+    const items = Array.isArray(order.items) ? order.items : [];
+    const lines = ["Hola, quiero enviar la información de mi pedido.", ""];
+
+    if (order.orderNumber) {
+      lines.push(`Número de pedido: ${order.orderNumber}`, "");
+    }
+
+    lines.push(
+      "Datos del comprador:",
+      `Nombre: ${buyer.name || ""}`,
+      `Teléfono: ${buyer.phone || ""}`,
+      `Dirección: ${buyer.address || ""}`,
+      `Número exterior: ${buyer.exteriorNumber || ""}`,
+      `Número interior: ${buyer.interiorNumber || ""}`,
+      `Código Postal: ${buyer.postalCode || ""}`,
+      `Colonia: ${buyer.colonia || ""}`,
+      `Alcaldía / Municipio: ${buyer.municipality || ""}`,
+      `Estado: ${buyer.state || ""}`,
+      `Correo electrónico: ${buyer.email || ""}`,
+      `Referencias: ${buyer.reference || ""}`,
+      "",
+      "Productos:"
+    );
+
+    items.forEach((item) => {
+      const quantity = Math.max(1, Number.parseInt(item.quantity, 10) || 1);
+      const unitPrice = safePrice(item.unitPrice ?? item.price);
+      const lineTotal = safePrice(item.lineTotal ?? item.subtotal ?? unitPrice * quantity);
+
+      lines.push(
+        `- ${item.title || "Producto"} × ${quantity} — ${formatWhatsAppMoney(lineTotal)}`
+      );
+    });
+
+    lines.push("", `Total: ${formatWhatsAppMoney(order.total ?? order.subtotal)}`);
+
+    return lines.join("\n");
+  }
+
+  function buildOrderSnapshot(formBuyer, cartItems, currencyCode) {
+    const buyer = {
+      name: String(formBuyer.name || "").trim(),
+      phone: String(formBuyer.phone || "").trim(),
+      email: String(formBuyer.email || "").trim(),
+      address: String(formBuyer.address || "").trim(),
+      exteriorNumber: String(formBuyer.exteriorNumber || "").trim(),
+      interiorNumber: String(formBuyer.interiorNumber || "").trim(),
+      postalCode: String(formBuyer.postalCode || "").trim(),
+      colonia: String(formBuyer.colonia || "").trim(),
+      municipality: String(formBuyer.municipality || "").trim(),
+      state: String(formBuyer.state || "").trim(),
+      reference: String(formBuyer.reference || "").trim(),
+      comments: String(formBuyer.comments || "").trim()
+    };
+
+    buyer.street = buildBuyerStreet(buyer);
+
+    const items = cartItems.map((entry) => {
+      const unitPrice = safePrice(entry.product?.price);
+      const quantity = Math.max(1, Number.parseInt(entry.quantity, 10) || 1);
+      const lineTotal = unitPrice * quantity;
+
+      return {
+        productId: entry.product.id,
+        variantId: entry.product.variantId,
+        id: entry.product.id,
+        title: entry.product.title || "Producto",
+        quantity,
+        unitPrice,
+        price: unitPrice,
+        lineTotal
+      };
+    });
+
+    const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+
+    return {
+      buyer,
+      items,
+      subtotal,
+      total: subtotal,
+      currency: currencyCode
+    };
+  }
+
+  function isCompletedOrderReady(order) {
+    return Boolean(
+      order?.orderNumber &&
+        order?.buyer?.name &&
+        Array.isArray(order.items) &&
+        order.items.length > 0
+    );
+  }
 
   function initCatalog(root) {
     /* ==================================================
        CONFIGURATION AND DOM REFERENCES
        ================================================== */
     const productsUrl = root.dataset.productsUrl || "/apps/msc/products";
-    const requestUrl = root.dataset.requestUrl || "/apps/msc/request";
+    const orderUrl =
+      root.dataset.orderUrl ||
+      root.dataset.requestUrl ||
+      "/apps/msc/order";
     const clickUrl = root.dataset.clickUrl || "/apps/msc/click";
     const currency = root.dataset.currency || "MXN";
-    const whatsappNumber = String(root.dataset.whatsapp || "").replace(/\D/g, "");
+    const isDevCatalog =
+      /localhost|127\.0\.0\.1/.test(window.location.hostname) ||
+      root.dataset.devMode === "true";
+    const sellerWhatsApp = String(root.dataset.sellerWhatsapp || DEFAULT_SELLER_WHATSAPP)
+      .replace(/\D/g, "") || DEFAULT_SELLER_WHATSAPP;
 
     const el = {
       status: root.querySelector("[data-msc-status]"),
@@ -81,7 +232,9 @@
       checkoutItems: root.querySelector("[data-msc-checkout-items]"),
       checkoutTotal: root.querySelector("[data-msc-checkout-total]"),
       submit: root.querySelector("[data-msc-submit]"),
-      message: root.querySelector("[data-msc-message]")
+      whatsappInfo: root.querySelector("[data-msc-whatsapp-info]"),
+      message: root.querySelector("[data-msc-message]"),
+      devWhatsAppTest: root.querySelector("[data-msc-dev-whatsapp-test]")
     };
 
     /* ==================================================
@@ -91,11 +244,120 @@
       products: [],
       cart: [],
       selectedProduct: null,
-      selectedQuantity: 1
+      selectedQuantity: 1,
+      completedOrder: null,
+      isLoadingProducts: false
     };
 
-    bindEvents();
-    loadProducts();
+    const cartStorageKey = `msc-catalog-cart:${root.id || "default"}`;
+
+    function buildSellerWhatsAppUrl(message) {
+      return `https://wa.me/${sellerWhatsApp}?text=${encodeURIComponent(message)}`;
+    }
+
+    function updateWhatsAppButton() {
+      if (!el.whatsappInfo) return;
+
+      const isReady = isCompletedOrderReady(state.completedOrder);
+      el.whatsappInfo.textContent = isReady
+        ? WHATSAPP_LABEL_AFTER
+        : WHATSAPP_LABEL_BEFORE;
+    }
+
+    function openWhatsAppWithMessage(message) {
+      const whatsappUrl = buildSellerWhatsAppUrl(message);
+
+      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    }
+
+    function buildWhatsAppMessageFromCheckout() {
+      if (isCompletedOrderReady(state.completedOrder)) {
+        return buildWhatsAppOrderMessage(state.completedOrder);
+      }
+
+      if (!state.cart.length) {
+        return null;
+      }
+
+      const formBuyer = Object.fromEntries(new FormData(el.checkoutForm).entries());
+      const orderSnapshot = buildOrderSnapshot(formBuyer, state.cart, currency);
+
+      return buildWhatsAppOrderMessage(orderSnapshot);
+    }
+
+    function updateDevWhatsAppTestVisibility() {
+      if (!el.devWhatsAppTest) return;
+
+      el.devWhatsAppTest.hidden = !isDevCatalog;
+    }
+
+    function previewWhatsAppFromSnapshot(orderSnapshot) {
+      const previewOrder = {
+        ...orderSnapshot,
+        orderNumber: "PREVIEW-TEST"
+      };
+      const whatsappMessage = buildWhatsAppOrderMessage(previewOrder);
+      const whatsappUrl = buildSellerWhatsAppUrl(whatsappMessage);
+
+      console.log("[WHATSAPP PREVIEW]", {
+        itemCount: previewOrder.items.length,
+        buyerName: previewOrder.buyer?.name,
+        messageLength: whatsappMessage.length,
+        url: whatsappUrl
+      });
+
+      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    }
+
+    /* ==================================================
+       POSTAL CODE INPUT (manual, Mexico 5 digits)
+       ================================================== */
+    const POSTAL_CODE_INVALID_MESSAGE =
+      "Ingresa un Código Postal mexicano válido de 5 dígitos.";
+
+    function normalizePostalCodeInput(value) {
+      return String(value || "").replace(/\D/g, "").slice(0, 5);
+    }
+
+    function isValidMexicanPostalCode(value) {
+      const normalized = normalizePostalCodeInput(value);
+      return /^\d{5}$/.test(normalized) && normalized !== "00000";
+    }
+
+    function getPostalCodeInput() {
+      return el.checkoutForm?.querySelector('input[name="postalCode"]') || null;
+    }
+
+    function bindPostalCodeInput() {
+      const postalInput = getPostalCodeInput();
+      if (!postalInput) return;
+
+      postalInput.addEventListener("input", () => {
+        const normalized = normalizePostalCodeInput(postalInput.value);
+
+        if (postalInput.value !== normalized) {
+          postalInput.value = normalized;
+        }
+
+        if (isValidMexicanPostalCode(postalInput.value)) {
+          postalInput.setCustomValidity("");
+        }
+      });
+    }
+
+    function validatePostalCodeField() {
+      const postalInput = getPostalCodeInput();
+      if (!postalInput) return true;
+
+      if (isValidMexicanPostalCode(postalInput.value)) {
+        postalInput.setCustomValidity("");
+        return true;
+      }
+
+      postalInput.setCustomValidity(POSTAL_CODE_INVALID_MESSAGE);
+      postalInput.reportValidity();
+      return false;
+    }
 
     /* ==================================================
        EVENT LISTENERS
@@ -131,6 +393,7 @@
         if (!state.cart.length) return;
 
         closeCart();
+        state.completedOrder = null;
         renderCheckout();
 
         if (el.checkoutInner) {
@@ -138,6 +401,7 @@
         }
 
         showLayer(el.checkoutModal);
+        updateWhatsAppButton();
 
         requestAnimationFrame(() => {
           if (el.checkoutInner) {
@@ -150,6 +414,69 @@
       });
 
       el.checkoutForm?.addEventListener("submit", submitOrder);
+      bindPostalCodeInput();
+
+      el.whatsappInfo?.addEventListener("click", () => {
+        if (isCompletedOrderReady(state.completedOrder)) {
+          const whatsappMessage = buildWhatsAppOrderMessage(state.completedOrder);
+
+          console.log("[WHATSAPP]", {
+            orderNumber: state.completedOrder.orderNumber,
+            itemCount: state.completedOrder.items.length,
+            buyerName: state.completedOrder.buyer?.name,
+            messageLength: whatsappMessage.length
+          });
+
+          openWhatsAppWithMessage(whatsappMessage);
+          return;
+        }
+
+        if (!el.checkoutForm?.reportValidity()) {
+          return;
+        }
+
+        if (!validatePostalCodeField()) {
+          return;
+        }
+
+        const whatsappMessage = buildWhatsAppMessageFromCheckout();
+
+        if (!whatsappMessage) {
+          setMessage("La lista está vacía.");
+          return;
+        }
+
+        openWhatsAppWithMessage(whatsappMessage);
+      });
+
+      updateWhatsAppButton();
+      updateDevWhatsAppTestVisibility();
+
+      el.devWhatsAppTest?.addEventListener("click", (event) => {
+        event.preventDefault();
+
+        if (!state.cart.length || !el.checkoutForm?.reportValidity()) {
+          setMessage("Complete los datos del pedido para probar el mensaje.");
+          return;
+        }
+
+        if (!validatePostalCodeField()) {
+          return;
+        }
+
+        const formBuyer = Object.fromEntries(new FormData(el.checkoutForm).entries());
+        const orderSnapshot = buildOrderSnapshot(formBuyer, state.cart, currency);
+
+        if (isDevCatalog) {
+          console.log("[ORDER DEBUG]", {
+            buyer: orderSnapshot.buyer,
+            cartItems: orderSnapshot.items,
+            cartLength: orderSnapshot.items.length
+          });
+        }
+
+        previewWhatsAppFromSnapshot(orderSnapshot);
+      });
 
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
@@ -163,42 +490,110 @@
        API REQUESTS
        ================================================== */
     async function loadProducts() {
+      state.isLoadingProducts = true;
       setStatus("Cargando productos...", false);
 
       try {
-        const response = await fetch(productsUrl, {
-          credentials: "same-origin",
-          headers: { Accept: "application/json" }
-        });
+        if (!el.grid) {
+          throw new Error("Product grid element not found.");
+        }
 
-        const rawText = await response.text();
-        let payload = {};
+        console.log("[MSC catalog] fetching products from", productsUrl);
+
+        const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+        const timeoutId = controller
+          ? setTimeout(() => controller.abort(), 30000)
+          : null;
+
+        let response;
 
         try {
-          payload = rawText ? JSON.parse(rawText) : {};
-        } catch {
-          throw new Error("La respuesta del servidor no es JSON válido.");
+          response = await fetch(productsUrl, {
+            credentials: "same-origin",
+            headers: { Accept: "application/json" },
+            signal: controller?.signal
+          });
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId);
         }
 
-        if (!response.ok) {
-          throw new Error(payload?.error || payload?.message || `HTTP ${response.status}`);
+        const rawText = await response.text();
+        let payload = null;
+
+        console.log("[MSC catalog] products HTTP response", {
+          url: productsUrl,
+          status: response.status,
+          ok: response.ok,
+          contentType: response.headers.get("content-type") || "",
+          bodyPreview: rawText.slice(0, 160)
+        });
+
+        if (rawText.trim().startsWith("<")) {
+          throw new Error(
+            `HTTP ${response.status}: HTML response (app proxy or session issue).`
+          );
         }
 
-        state.products = extractProducts(payload)
+        try {
+          payload = rawText ? JSON.parse(rawText) : null;
+        } catch (parseError) {
+          console.error("[MSC catalog] invalid JSON payload:", parseError, rawText);
+          throw new Error(`HTTP ${response.status}: invalid JSON response.`);
+        }
+
+        if (!response.ok || payload?.ok === false) {
+          console.error("[MSC catalog] products API error:", {
+            status: response.status,
+            payload
+          });
+          throw new Error(
+            payload?.error ||
+              payload?.message ||
+              `HTTP ${response.status}`
+          );
+        }
+
+        const extracted = extractProducts(payload);
+
+        console.log("[MSC catalog] extracted products", {
+          count: extracted.length,
+          shape: Array.isArray(payload?.products)
+            ? "payload.products"
+            : payload?.data?.products
+              ? "payload.data.products"
+              : "unknown"
+        });
+
+        if (!extracted.length) {
+          console.error("[MSC catalog] products array empty or missing:", payload);
+          setStatus("No hay productos publicados disponibles.", false);
+          return;
+        }
+
+        state.products = extracted
           .map(normalizeProduct)
           .filter((product) => product.id && product.title);
 
         if (!state.products.length) {
+          console.warn("[MSC catalog] normalized product list empty:", payload);
           setStatus("No hay productos publicados disponibles.", false);
-          console.warn("MSC products payload:", payload);
           return;
         }
 
+        restoreCart();
         hideStatus();
         renderProducts();
+        renderCart();
       } catch (error) {
-        console.error("MSC product loading error:", error);
-        setStatus(`No se pudieron cargar los productos. ${error.message}`, true);
+        const detail = error instanceof Error ? error.message : String(error);
+        console.error("[MSC catalog] product loading failed:", {
+          productsUrl,
+          detail,
+          error
+        });
+        setStatus("No se pudieron cargar los productos.", true);
+      } finally {
+        state.isLoadingProducts = false;
       }
     }
 
@@ -258,6 +653,22 @@
         firstVariant?.image?.src ||
         "";
 
+      const compareAtCandidate =
+        raw?.compareAtPrice ??
+        raw?.compare_at_price ??
+        firstVariant?.compareAtPrice ??
+        firstVariant?.compare_at_price ??
+        0;
+
+      const promotionRaw = raw?.promotion;
+      let promotionLabel = "";
+
+      if (typeof promotionRaw === "string" && promotionRaw.trim() && promotionRaw !== "false") {
+        promotionLabel = promotionRaw.trim();
+      } else if (promotionRaw === true) {
+        promotionLabel = "Promoción";
+      }
+
       return {
         id: String(raw?.id || raw?.productId || raw?.product_id || raw?.handle || index + 1),
         variantId: String(firstVariant?.id || raw?.variantId || raw?.variant_id || ""),
@@ -266,6 +677,8 @@
         image: normalizeImageUrl(imageUrl),
         imageAlt: featuredImage?.altText || featuredImage?.alt || raw?.title || "",
         price: parseMoney(priceCandidate),
+        compareAtPrice: parseMoney(compareAtCandidate),
+        promotionLabel,
         handle: raw?.handle || "",
         available:
           raw?.availableForSale ??
@@ -299,6 +712,8 @@
        PRODUCT RENDERING
        ================================================== */
     function renderProducts() {
+      if (!el.grid) return;
+
       el.grid.innerHTML = "";
       const fragment = document.createDocumentFragment();
 
@@ -313,6 +728,13 @@
 
         const media = document.createElement("div");
         media.className = "msc-product-media";
+
+        if (product.promotionLabel) {
+          const badge = document.createElement("span");
+          badge.className = "msc-product-badge";
+          badge.textContent = product.promotionLabel;
+          media.appendChild(badge);
+        }
 
         if (product.image) {
           const image = document.createElement("img");
@@ -344,11 +766,22 @@
         title.className = "msc-product-name";
         title.textContent = product.title;
 
-        const price = document.createElement("div");
-        price.className = "msc-product-price";
-        price.textContent = formatMoney(product.price);
+        const prices = document.createElement("div");
+        prices.className = "msc-product-prices";
 
-        info.append(title, price);
+        if (product.compareAtPrice > product.price) {
+          const comparePrice = document.createElement("span");
+          comparePrice.className = "msc-product-compare-price";
+          comparePrice.textContent = formatCardPrice(product.compareAtPrice);
+          prices.appendChild(comparePrice);
+        }
+
+        const price = document.createElement("span");
+        price.className = "msc-product-price";
+        price.textContent = formatCardPrice(product.price);
+        prices.appendChild(price);
+
+        info.append(title, prices);
         button.append(media, info);
         card.appendChild(button);
 
@@ -411,6 +844,87 @@
     /* ==================================================
        CART STATE
        ================================================== */
+    function invalidateStoredCart() {
+      try {
+        localStorage.removeItem(cartStorageKey);
+      } catch (error) {
+        console.warn("MSC cart storage remove failed:", error);
+      }
+    }
+
+    function saveCart() {
+      try {
+        const payload = {
+          version: 1,
+          items: state.cart.map((item) => ({
+            productId: item.product.id,
+            quantity: item.quantity
+          }))
+        };
+        localStorage.setItem(cartStorageKey, JSON.stringify(payload));
+      } catch (error) {
+        console.warn("MSC cart storage save failed:", error);
+      }
+    }
+
+    function restoreCart() {
+      let raw = null;
+
+      try {
+        raw = localStorage.getItem(cartStorageKey);
+      } catch (error) {
+        console.warn("MSC cart storage read failed:", error);
+        return;
+      }
+
+      if (!raw) return;
+
+      let parsed = null;
+
+      try {
+        parsed = JSON.parse(raw);
+      } catch (error) {
+        console.warn("MSC cart storage parse failed:", error);
+        state.cart = [];
+        invalidateStoredCart();
+        return;
+      }
+
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        parsed.version !== 1 ||
+        !Array.isArray(parsed.items)
+      ) {
+        state.cart = [];
+        invalidateStoredCart();
+        return;
+      }
+
+      const productById = new Map(state.products.map((product) => [product.id, product]));
+      const restored = [];
+
+      parsed.items.forEach((item) => {
+        const productId = String(item?.productId ?? "").trim();
+        if (!productId) return;
+
+        const quantityValue = item?.quantity;
+        if (typeof quantityValue !== "number" || !Number.isFinite(quantityValue)) return;
+
+        const quantity = Math.floor(quantityValue);
+        if (quantity <= 0) return;
+
+        const currentProduct = productById.get(productId);
+        if (!currentProduct) return;
+
+        const existing = restored.find((entry) => entry.product.id === productId);
+        if (existing) existing.quantity += quantity;
+        else restored.push({ product: currentProduct, quantity });
+      });
+
+      state.cart = restored;
+    }
+
     function addToCart(product, quantity) {
       const existing = state.cart.find((item) => item.product.id === product.id);
       if (existing) existing.quantity += quantity;
@@ -432,6 +946,7 @@
 
       if (!state.cart.length) {
         el.cartEmpty.hidden = false;
+        saveCart();
         return;
       }
 
@@ -511,6 +1026,8 @@
         row.appendChild(content);
         el.cartItems.appendChild(row);
       });
+
+      saveCart();
     }
 
     /* ==================================================
@@ -551,10 +1068,11 @@
     function closeCheckout() {
       hideLayer(el.checkoutModal);
       setMessage("");
+      updateWhatsAppButton();
     }
 
     /* ==================================================
-       WHATSAPP ORDER
+       ORDER SUBMISSION
        ================================================== */
     async function submitOrder(event) {
       event.preventDefault();
@@ -566,93 +1084,98 @@
 
       if (!el.checkoutForm.reportValidity()) return;
 
-      const customer = Object.fromEntries(new FormData(el.checkoutForm).entries());
-      const order = {
-        customer,
-        items: state.cart.map((item) => ({
-          productId: item.product.id,
-          variantId: item.product.variantId,
-          title: item.product.title,
-          price: item.product.price,
-          quantity: item.quantity,
-          total: item.product.price * item.quantity
-        })),
-        currency,
-        total: getCartTotal()
-      };
+      if (!validatePostalCodeField()) return;
+
+      const formBuyer = Object.fromEntries(new FormData(el.checkoutForm).entries());
+      const orderSnapshot = buildOrderSnapshot(formBuyer, state.cart, currency);
+
+      if (!orderSnapshot.items.length) {
+        setMessage("La lista está vacía.");
+        return;
+      }
+
+      if (isDevCatalog) {
+        console.log("[ORDER DEBUG]", {
+          buyer: orderSnapshot.buyer,
+          cartItems: orderSnapshot.items,
+          cartLength: orderSnapshot.items.length
+        });
+      }
 
       setSubmitting(true);
       setMessage("");
 
-      let responsePayload = null;
+      console.log("[ORDER] Sending request", {
+        endpoint: orderUrl,
+        itemCount: orderSnapshot.items.length
+      });
 
       try {
-        const response = await fetch(requestUrl, {
+        const response = await fetch(orderUrl, {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify(order)
+          body: JSON.stringify(orderSnapshot)
+        });
+
+        console.log("[ORDER] Response", {
+          status: response.status,
+          contentType: response.headers.get("content-type")
         });
 
         const responseText = await response.text();
-        if (responseText) {
-          try { responsePayload = JSON.parse(responseText); } catch {}
+        let result = {};
+
+        try {
+          result = responseText ? JSON.parse(responseText) : {};
+        } catch (parseError) {
+          console.error("[ORDER] Non-JSON response", {
+            status: response.status,
+            preview: responseText.slice(0, 500)
+          });
+          throw new Error(`NON_JSON_RESPONSE_${response.status}`);
         }
-      } catch (error) {
-        console.warn("MSC request endpoint unavailable:", error);
-      }
 
-      const returnedUrl =
-        responsePayload?.whatsappUrl ||
-        responsePayload?.whatsapp_url ||
-        responsePayload?.url ||
-        "";
+        if (!response.ok || !result.ok) {
+          console.error("[ORDER] Request failed", {
+            status: response.status,
+            errorCode: result.error,
+            message: result.message
+          });
+          throw new Error(result.error || `ORDER_REQUEST_FAILED_${response.status}`);
+        }
 
-      const whatsappUrl = returnedUrl || buildWhatsappUrl(order, whatsappNumber);
+        const orderNumber = String(result.orderNumber || "").trim();
+        const completedOrderData = {
+          ...orderSnapshot,
+          orderNumber,
+          submittedAt: new Date().toISOString()
+        };
 
-      if (!whatsappUrl) {
-        setMessage("Configure el número de WhatsApp en el bloque MSC Catalog.");
+        state.completedOrder = completedOrderData;
+
+        state.cart = [];
+        saveCart();
+        renderCart();
+        el.checkoutForm.reset();
+
         setSubmitting(false);
-        return;
+
+        if (orderNumber) {
+          setMessage(
+            `Pedido enviado correctamente.\nNúmero de pedido: ${orderNumber}`,
+            true
+          );
+        } else {
+          setMessage("Pedido enviado correctamente.", true);
+        }
+
+        updateWhatsAppButton();
+      } catch (error) {
+        console.error("[ORDER] Request failed", error);
+        setMessage("No se pudo enviar el pedido. Inténtalo nuevamente.");
+        setSubmitting(false);
       }
-
-      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
-      setMessage("El pedido está listo para enviarse por WhatsApp.", true);
-      setSubmitting(false);
-    }
-
-    function buildWhatsappUrl(order, phone) {
-      if (!phone) return "";
-
-      const c = order.customer;
-      const address = [
-        c.address,
-        c.exteriorNumber ? `Ext. ${c.exteriorNumber}` : "",
-        c.interiorNumber ? `Int. ${c.interiorNumber}` : "",
-        c.colonia,
-        c.municipality,
-        c.state,
-        c.postalCode ? `C.P. ${c.postalCode}` : ""
-      ].filter(Boolean).join(", ");
-
-      const lines = [
-        "Hola, quiero realizar el siguiente pedido:",
-        "",
-        ...order.items.map((item) => `• ${item.title} × ${item.quantity} — ${formatMoney(item.total)}`),
-        "",
-        `Total: ${formatMoney(order.total)}`,
-        "",
-        "Datos del comprador:",
-        `Nombre: ${c.name || ""}`,
-        `Teléfono: ${c.phone || ""}`,
-        `Dirección: ${address}`,
-        c.email ? `Correo: ${c.email}` : "",
-        c.deliveryTime ? `Horario: ${c.deliveryTime}` : "",
-        c.reference ? `Referencias: ${c.reference}` : "",
-        c.comments ? `Comentarios: ${c.comments}` : ""
-      ].filter(Boolean);
-
-      return `https://wa.me/${phone}?text=${encodeURIComponent(lines.join("\n"))}`;
     }
 
     /* ==================================================
@@ -718,16 +1241,31 @@
       }
     }
 
+    function formatCardPrice(amount) {
+      const formatted = formatMoney(amount);
+      if (currency === "MXN" && !/\bMXN\b/i.test(formatted)) {
+        return `${formatted} MXN`;
+      }
+      return formatted;
+    }
+
     /* ==================================================
        LOADING AND ERROR HANDLING
        ================================================== */
     function setStatus(message, isError) {
+      if (!el.status) {
+        console.error("[MSC catalog] cannot set status:", message);
+        return;
+      }
+
       el.status.hidden = false;
       el.status.textContent = message;
       el.status.classList.toggle("is-error", Boolean(isError));
     }
 
     function hideStatus() {
+      if (!el.status) return;
+
       el.status.hidden = true;
       el.status.textContent = "";
       el.status.classList.remove("is-error");
@@ -742,7 +1280,16 @@
     function setSubmitting(value) {
       if (!el.submit) return;
       el.submit.disabled = value;
-      el.submit.textContent = value ? "Preparando pedido..." : "Enviar pedido por WhatsApp";
+      el.submit.textContent = value ? "Enviando..." : "Enviar pedido";
+    }
+
+    loadProducts();
+
+    try {
+      bindEvents();
+      updateWhatsAppButton();
+    } catch (initError) {
+      console.error("[MSC catalog] non-blocking init error:", initError);
     }
   }
 
