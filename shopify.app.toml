@@ -2,7 +2,7 @@
 
 client_id = "f324017abfd7457a30277ec72f9e705c"
 name = "minisupercoreano-catalog"
-application_url = "https://example.com"
+application_url = "https://YOUR-PRODUCTION-DOMAIN"
 embedded = true
 
 [access_scopes]
@@ -45,7 +45,7 @@ api_version = "2026-10"
   topics = [ "app/scopes_update" ]
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://YOUR-PRODUCTION-DOMAIN/api/auth" ]
 
 [build]
 include_config_on_deploy = true

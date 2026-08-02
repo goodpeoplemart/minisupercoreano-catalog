@@ -205,10 +205,12 @@ export function buildOrderEmailText({
   items,
   currencyCode,
   subtotal,
-  uniqueProducts,
-  totalQuantity,
+  uniqueProducts: _uniqueProducts,
+  totalQuantity: _totalQuantity,
   orderedAt,
 }) {
+  void _uniqueProducts;
+  void _totalQuantity;
   const notes = buildCustomerNotes(customer);
   const productLines = items
     .map(
@@ -269,9 +271,7 @@ export function logOrderEmailConfiguration() {
     process.env.ORDER_EMAIL_FROM || process.env.EMAIL_FROM,
   );
   const hasTo = Boolean(
-    process.env.ORDER_EMAIL_TO ||
-      process.env.SELLER_EMAIL ||
-      "goodpeoplemart@gmail.com",
+    process.env.ORDER_EMAIL_TO || process.env.SELLER_EMAIL,
   );
 
   console.log("[ORDER SERVER] Email config", {
@@ -286,6 +286,7 @@ export function logOrderEmailConfiguration() {
   const missing = [];
   if (!hasApiKey) missing.push("RESEND_API_KEY");
   if (!hasFrom) missing.push("ORDER_EMAIL_FROM");
+  if (!hasTo) missing.push("ORDER_EMAIL_TO");
 
   if (missing.length) {
     console.error(
@@ -307,6 +308,11 @@ export function assertOrderEmailConfig() {
     missing.push("ORDER_EMAIL_FROM");
   }
 
+  const to = process.env.ORDER_EMAIL_TO || process.env.SELLER_EMAIL;
+  if (!to) {
+    missing.push("ORDER_EMAIL_TO");
+  }
+
   if (missing.length) {
     throw new Error(`Missing ${missing.join(", ")}`);
   }
@@ -314,10 +320,7 @@ export function assertOrderEmailConfig() {
   return {
     apiKey: process.env.RESEND_API_KEY,
     from,
-    to:
-      process.env.ORDER_EMAIL_TO ||
-      process.env.SELLER_EMAIL ||
-      "goodpeoplemart@gmail.com",
+    to,
   };
 }
 

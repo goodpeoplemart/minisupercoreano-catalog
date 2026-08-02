@@ -57,6 +57,150 @@
   const WHATSAPP_LABEL_BEFORE = "Enviar información por WhatsApp";
   const WHATSAPP_LABEL_AFTER = "Enviar pedido por WhatsApp";
 
+  function applyThemeHeaderLogo(logoUrl) {
+    if (!logoUrl) return;
+
+    document
+      .querySelectorAll(
+        ".header__heading-link, .site-header__logo a, .header__logo a",
+      )
+      .forEach((link) => {
+        if (!(link instanceof HTMLAnchorElement)) return;
+
+        const existingLogo = link.querySelector(".msc-header-logo");
+        if (existingLogo instanceof HTMLImageElement) {
+          existingLogo.src = logoUrl;
+          link.dataset.mscHeaderLogoApplied = "true";
+          return;
+        }
+
+        if (link.dataset.mscHeaderLogoApplied === "true") return;
+
+        const img = document.createElement("img");
+        img.src = logoUrl;
+        img.alt = "Mini Super Coreano";
+        img.className = "msc-header-logo";
+
+        link.replaceChildren(img);
+        link.setAttribute("aria-label", "Mini Super Coreano");
+        link.dataset.mscHeaderLogoApplied = "true";
+      });
+  }
+
+  function updateMobileHeaderHeight() {
+    const header =
+      document.querySelector("sticky-header .header") ||
+      document.querySelector(".header-wrapper .header") ||
+      document.querySelector("header.header") ||
+      document.querySelector(".header");
+
+    const height =
+      header instanceof HTMLElement
+        ? Math.max(0, Math.round(header.getBoundingClientRect().height))
+        : 56;
+
+    document.documentElement.style.setProperty(
+      "--msc-mobile-header-height",
+      `${height}px`,
+    );
+  }
+
+  function updateDevToolbarOffset() {
+    const bar =
+      document.getElementById("PBarNextFrameWrapper") ||
+      document.getElementById("PBarNextFrame") ||
+      document.querySelector('[id*="PBarNextFrame"]');
+
+    const height =
+      bar instanceof HTMLElement ? Math.ceil(bar.getBoundingClientRect().height) : 0;
+
+    document.documentElement.style.setProperty(
+      "--msc-dev-toolbar-offset",
+      `${Math.max(0, height)}px`,
+    );
+  }
+
+  function placeListaButton(root, listaBtn) {
+    if (!root || !listaBtn) return;
+
+    const container = root.querySelector(".msc-container");
+    const mobile = window.matchMedia("(max-width: 768px)").matches;
+
+    if (mobile) {
+      if (listaBtn.parentElement !== document.body) {
+        document.body.appendChild(listaBtn);
+      }
+      return;
+    }
+
+    if (listaBtn.parentElement !== root) {
+      root.insertBefore(listaBtn, container || null);
+      return;
+    }
+
+    if (container && listaBtn.nextElementSibling !== container) {
+      root.insertBefore(listaBtn, container);
+    }
+  }
+
+  function ensureListaButton(root, cartLabel = "Lista") {
+    if (!root) return null;
+
+    let listaBtn =
+      root.querySelector(":scope > [data-msc-open-cart]") ||
+      document.querySelector(`[data-msc-open-cart][data-msc-catalog-id="${root.id}"]`) ||
+      document.querySelector("[data-msc-open-cart]");
+
+    if (!listaBtn) {
+      listaBtn = document.createElement("button");
+      listaBtn.type = "button";
+      listaBtn.className = "msc-list-button";
+      listaBtn.setAttribute("data-msc-open-cart", "");
+      listaBtn.setAttribute("aria-label", "Abrir lista de compra");
+
+      const icon = document.createElement("span");
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "🛒";
+
+      const label = document.createElement("span");
+      label.textContent = cartLabel;
+
+      const count = document.createElement("span");
+      count.className = "msc-list-count";
+      count.setAttribute("data-msc-cart-count", "");
+      count.textContent = "0";
+
+      listaBtn.append(icon, label, count);
+    }
+
+    listaBtn.dataset.mscCatalogId = root.id;
+
+    const labelSpan = Array.from(listaBtn.children).find(
+      (node) =>
+        node instanceof HTMLSpanElement &&
+        !node.hasAttribute("aria-hidden") &&
+        !node.classList.contains("msc-list-count"),
+    );
+    if (labelSpan) labelSpan.textContent = cartLabel;
+
+    if (!listaBtn.querySelector("[data-msc-cart-count]")) {
+      const count = document.createElement("span");
+      count.className = "msc-list-count";
+      count.setAttribute("data-msc-cart-count", "");
+      count.textContent = "0";
+      listaBtn.appendChild(count);
+    }
+
+    listaBtn.hidden = false;
+    listaBtn.removeAttribute("hidden");
+    delete listaBtn.dataset.mscListaMounted;
+
+    placeListaButton(root, listaBtn);
+    updateDevToolbarOffset();
+
+    return listaBtn;
+  }
+
   function safePrice(value) {
     const amount = Number(value);
     return Number.isFinite(amount) && amount >= 0 ? amount : 0;
@@ -202,40 +346,69 @@
       root.dataset.devMode === "true";
     const sellerWhatsApp = String(root.dataset.sellerWhatsapp || DEFAULT_SELLER_WHATSAPP)
       .replace(/\D/g, "") || DEFAULT_SELLER_WHATSAPP;
+    const headerLogoUrl =
+      root.dataset.headerLogoUrl || "/images/minisupercoreano-logo.png";
+    const cartLabel = root.dataset.cartLabel || "Lista";
+    const listaBtn = ensureListaButton(root, cartLabel);
+
+    const cartDrawer = root.querySelector("[data-msc-cart-drawer]");
+    const checkoutModal = root.querySelector("[data-msc-checkout-modal]");
+    const productModal = root.querySelector("[data-msc-product-modal]");
 
     const el = {
       status: root.querySelector("[data-msc-status]"),
       grid: root.querySelector("[data-msc-products-grid]"),
-      openCart: root.querySelector("[data-msc-open-cart]"),
-      cartDrawer: root.querySelector("[data-msc-cart-drawer]"),
-      closeCart: root.querySelectorAll("[data-msc-close-cart]"),
-      cartCount: root.querySelector("[data-msc-cart-count]"),
-      cartItems: root.querySelector("[data-msc-cart-items]"),
-      cartEmpty: root.querySelector("[data-msc-cart-empty]"),
-      cartTotal: root.querySelector("[data-msc-cart-total]"),
-      openCheckout: root.querySelector("[data-msc-open-checkout]"),
-      productModal: root.querySelector("[data-msc-product-modal]"),
-      closeProduct: root.querySelectorAll("[data-msc-close-product]"),
-      modalImage: root.querySelector("[data-msc-modal-image]"),
-      modalPlaceholder: root.querySelector("[data-msc-modal-placeholder]"),
-      modalTitle: root.querySelector("[data-msc-modal-title]"),
-      modalPrice: root.querySelector("[data-msc-modal-price]"),
-      modalDescription: root.querySelector("[data-msc-modal-description]"),
-      modalQuantity: root.querySelector("[data-msc-modal-quantity]"),
-      modalMinus: root.querySelector("[data-msc-modal-minus]"),
-      modalPlus: root.querySelector("[data-msc-modal-plus]"),
-      addCart: root.querySelector("[data-msc-add-cart]"),
-      checkoutModal: root.querySelector("[data-msc-checkout-modal]"),
-      checkoutInner: root.querySelector(".msc-checkout-inner"),
-      closeCheckout: root.querySelectorAll("[data-msc-close-checkout]"),
-      checkoutForm: root.querySelector("[data-msc-checkout-form]"),
-      checkoutItems: root.querySelector("[data-msc-checkout-items]"),
-      checkoutTotal: root.querySelector("[data-msc-checkout-total]"),
-      submit: root.querySelector("[data-msc-submit]"),
-      whatsappInfo: root.querySelector("[data-msc-whatsapp-info]"),
-      message: root.querySelector("[data-msc-message]"),
-      devWhatsAppTest: root.querySelector("[data-msc-dev-whatsapp-test]")
+      openCart: listaBtn,
+      cartDrawer,
+      closeCart: cartDrawer?.querySelectorAll("[data-msc-close-cart]") ?? [],
+      cartBody: cartDrawer?.querySelector(".msc-cart-body"),
+      cartCount: listaBtn?.querySelector("[data-msc-cart-count]"),
+      cartItems: cartDrawer?.querySelector("[data-msc-cart-items]"),
+      cartEmpty: cartDrawer?.querySelector("[data-msc-cart-empty]"),
+      cartTotal: cartDrawer?.querySelector("[data-msc-cart-total]"),
+      openCheckout: cartDrawer?.querySelector("[data-msc-open-checkout]"),
+      productModal,
+      productDialog: productModal?.querySelector(".msc-product-dialog"),
+      closeProduct: productModal?.querySelectorAll("[data-msc-close-product]") ?? [],
+      modalImage: productModal?.querySelector("[data-msc-modal-image]"),
+      modalPlaceholder: productModal?.querySelector("[data-msc-modal-placeholder]"),
+      modalTitle: productModal?.querySelector("[data-msc-modal-title]"),
+      modalPrice: productModal?.querySelector("[data-msc-modal-price]"),
+      modalDescription: productModal?.querySelector("[data-msc-modal-description]"),
+      modalQuantity: productModal?.querySelector("[data-msc-modal-quantity]"),
+      modalMinus: productModal?.querySelector("[data-msc-modal-minus]"),
+      modalPlus: productModal?.querySelector("[data-msc-modal-plus]"),
+      addCart: productModal?.querySelector("[data-msc-add-cart]"),
+      checkoutModal,
+      checkoutInner: checkoutModal?.querySelector(".msc-checkout-inner"),
+      checkoutFormPanel: checkoutModal?.querySelector("[data-msc-checkout-form-panel]"),
+      closeCheckout: checkoutModal?.querySelectorAll("[data-msc-close-checkout]") ?? [],
+      checkoutForm: checkoutModal?.querySelector("[data-msc-checkout-form]"),
+      checkoutItems: checkoutModal?.querySelector("[data-msc-checkout-items]"),
+      checkoutTotal: checkoutModal?.querySelector("[data-msc-checkout-total]"),
+      submit: checkoutModal?.querySelector("[data-msc-submit]"),
+      whatsappInfo: checkoutModal?.querySelector("[data-msc-whatsapp-info]"),
+      message: checkoutModal?.querySelector("[data-msc-message]"),
+      successModal: checkoutModal?.querySelector("[data-msc-success-modal]"),
+      successMessage: checkoutModal?.querySelector("[data-msc-success-message]"),
+      successError: checkoutModal?.querySelector("[data-msc-success-error]"),
+      successWhatsapp: checkoutModal?.querySelector("[data-msc-success-whatsapp]"),
+      devWhatsAppTest: checkoutModal?.querySelector("[data-msc-dev-whatsapp-test]")
     };
+
+    [el.productModal, el.cartDrawer, el.checkoutModal].forEach((layer) => {
+      if (!layer) return;
+      layer.hidden = true;
+      layer.setAttribute("aria-hidden", "true");
+      layer.style.setProperty("display", "none", "important");
+    });
+
+    if (el.successModal) {
+      el.successModal.hidden = true;
+      el.successModal.setAttribute("aria-hidden", "true");
+    }
+
+    el.checkoutModal?.classList.remove("is-order-success");
 
     /* ==================================================
        APPLICATION STATE
@@ -246,7 +419,8 @@
       selectedProduct: null,
       selectedQuantity: 1,
       completedOrder: null,
-      isLoadingProducts: false
+      isLoadingProducts: false,
+      isSubmitting: false
     };
 
     const cartStorageKey = `msc-catalog-cart:${root.id || "default"}`;
@@ -270,19 +444,140 @@
       window.open(whatsappUrl, "_blank", "noopener,noreferrer");
     }
 
-    function buildWhatsAppMessageFromCheckout() {
-      if (isCompletedOrderReady(state.completedOrder)) {
-        return buildWhatsAppOrderMessage(state.completedOrder);
-      }
+    function buildWhatsAppMessageFromCompletedOrder() {
+      if (!isCompletedOrderReady(state.completedOrder)) return null;
+      return buildWhatsAppOrderMessage(state.completedOrder);
+    }
 
-      if (!state.cart.length) {
-        return null;
-      }
+    function buildWhatsAppMessageFromCheckoutForm() {
+      if (!el.checkoutForm?.reportValidity()) return null;
+      if (!validatePostalCodeField()) return null;
+      if (!state.cart.length) return null;
 
       const formBuyer = Object.fromEntries(new FormData(el.checkoutForm).entries());
       const orderSnapshot = buildOrderSnapshot(formBuyer, state.cart, currency);
 
       return buildWhatsAppOrderMessage(orderSnapshot);
+    }
+
+    function handleCheckoutWhatsAppClick() {
+      const completedMessage = buildWhatsAppMessageFromCompletedOrder();
+      if (completedMessage) {
+        console.log("[WHATSAPP]", {
+          orderNumber: state.completedOrder.orderNumber,
+          itemCount: state.completedOrder.items.length,
+          buyerName: state.completedOrder.buyer?.name,
+          messageLength: completedMessage.length
+        });
+        openWhatsAppWithMessage(completedMessage);
+        return;
+      }
+
+      const checkoutMessage = buildWhatsAppMessageFromCheckoutForm();
+      if (!checkoutMessage) {
+        setMessage("La lista está vacía.");
+        return;
+      }
+
+      openWhatsAppWithMessage(checkoutMessage);
+    }
+
+    function isCheckoutSuccessVisible() {
+      return Boolean(el.successModal && !el.successModal.hidden);
+    }
+
+    function showCheckoutFormView() {
+      if (el.checkoutFormPanel) {
+        el.checkoutFormPanel.hidden = false;
+        el.checkoutFormPanel.setAttribute("aria-hidden", "false");
+      }
+
+      hideOrderSuccessModal();
+      el.checkoutModal?.classList.remove("is-order-success");
+    }
+
+    function showCheckoutSuccessView(orderNumber) {
+      if (el.checkoutFormPanel) {
+        el.checkoutFormPanel.hidden = true;
+        el.checkoutFormPanel.setAttribute("aria-hidden", "true");
+      }
+
+      showOrderSuccessModal(orderNumber);
+      el.checkoutModal?.classList.add("is-order-success");
+
+      if (el.checkoutInner) {
+        el.checkoutInner.scrollTop = 0;
+      }
+      resetModalScroll(el.checkoutFormPanel);
+      resetModalScroll(el.successModal);
+    }
+
+    function showOrderSuccessModal(orderNumber) {
+      if (!el.successModal) return;
+
+      const text = orderNumber
+        ? `El pedido se envió correctamente por correo electrónico.\nNúmero de pedido: ${orderNumber}`
+        : "El pedido se envió correctamente por correo electrónico.";
+
+      if (el.successMessage) el.successMessage.textContent = text;
+      if (el.successError) {
+        el.successError.hidden = true;
+        el.successError.textContent = "";
+      }
+
+      el.successModal.hidden = false;
+      el.successModal.setAttribute("aria-hidden", "false");
+    }
+
+    function hideOrderSuccessModal() {
+      if (!el.successModal) return;
+
+      el.successModal.hidden = true;
+      el.successModal.setAttribute("aria-hidden", "true");
+
+      if (el.successError) {
+        el.successError.hidden = true;
+        el.successError.textContent = "";
+      }
+    }
+
+    function setSuccessModalError(message) {
+      if (!el.successError) return;
+
+      el.successError.hidden = !message;
+      el.successError.textContent = message || "";
+    }
+
+    function handleSuccessWhatsAppClick() {
+      try {
+        const whatsappMessage = buildWhatsAppMessageFromCompletedOrder();
+
+        if (!whatsappMessage) {
+          throw new Error("Completed order data unavailable for WhatsApp");
+        }
+
+        openWhatsAppWithMessage(whatsappMessage);
+        handleSuccessModalClose();
+      } catch (error) {
+        console.error("[WHATSAPP] open failed:", error);
+        setSuccessModalError("No se pudo preparar el envío por WhatsApp.");
+      }
+    }
+
+    function resetOrderAndBuyerData() {
+      state.completedOrder = null;
+      state.cart = [];
+      saveCart();
+      renderCart();
+      showCheckoutFormView();
+      hideLayer(el.checkoutModal);
+      el.checkoutForm?.reset();
+      setMessage("");
+      updateWhatsAppButton();
+    }
+
+    function handleSuccessModalClose() {
+      resetOrderAndBuyerData();
     }
 
     function updateDevWhatsAppTestVisibility() {
@@ -359,11 +654,82 @@
       return false;
     }
 
+    function isMobileCatalogViewport() {
+      return window.matchMedia("(max-width: 768px)").matches;
+    }
+
+    function findProductCard(productId) {
+      if (!productId || !el.grid) return null;
+
+      const escapedId =
+        typeof CSS !== "undefined" && typeof CSS.escape === "function"
+          ? CSS.escape(String(productId))
+          : String(productId).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
+      return el.grid.querySelector(`[data-msc-product-id="${escapedId}"]`);
+    }
+
+    function scrollToProductCardAfterAdd(productId) {
+      if (!productId || !isMobileCatalogViewport()) return;
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const target = findProductCard(productId);
+          if (target) {
+            target.scrollIntoView({ behavior: "auto", block: "start" });
+          }
+        });
+      });
+    }
+
     /* ==================================================
        EVENT LISTENERS
        ================================================== */
+    function isModalLayer(element) {
+      return Boolean(
+        element?.matches?.(
+          "[data-msc-product-modal], [data-msc-cart-drawer], [data-msc-checkout-modal]",
+        ),
+      );
+    }
+
+    function syncModalLayerDisplay(element, visible) {
+      if (!isModalLayer(element)) return;
+
+      element.style.setProperty("display", visible ? "flex" : "none", "important");
+    }
+
+    function closeAllModals() {
+      [el.productModal, el.cartDrawer, el.checkoutModal].forEach((modal) => {
+        if (!modal) return;
+        hideLayer(modal);
+      });
+
+      hideOrderSuccessModal();
+      showCheckoutFormView();
+      el.checkoutModal?.classList.remove("is-order-success");
+    }
+
+    function handleOpenCartClick(event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!event.currentTarget?.matches("[data-msc-open-cart]")) return;
+
+      openCart();
+    }
+
+    function handleOpenCheckoutClick(event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!event.currentTarget?.matches("[data-msc-open-checkout]")) return;
+
+      openCheckout();
+    }
+
     function bindEvents() {
-      el.openCart?.addEventListener("click", openCart);
+      el.openCart?.addEventListener("click", handleOpenCartClick);
       el.closeCart.forEach((button) => button.addEventListener("click", closeCart));
       el.closeProduct.forEach((button) => button.addEventListener("click", closeProduct));
       el.closeCheckout.forEach((button) => button.addEventListener("click", closeCheckout));
@@ -381,73 +747,19 @@
       el.addCart?.addEventListener("click", () => {
         if (!state.selectedProduct) return;
 
+        const addedProductId = state.selectedProduct.id;
         addToCart(state.selectedProduct, state.selectedQuantity);
         closeProduct();
-
-        requestAnimationFrame(() => {
-          root.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
+        scrollToProductCardAfterAdd(addedProductId);
       });
 
-      el.openCheckout?.addEventListener("click", () => {
-        if (!state.cart.length) return;
-
-        closeCart();
-        state.completedOrder = null;
-        renderCheckout();
-
-        if (el.checkoutInner) {
-          el.checkoutInner.scrollTop = 0;
-        }
-
-        showLayer(el.checkoutModal);
-        updateWhatsAppButton();
-
-        requestAnimationFrame(() => {
-          if (el.checkoutInner) {
-            el.checkoutInner.scrollTop = 0;
-          }
-
-          const firstField = el.checkoutForm?.querySelector('input[name="name"]');
-          firstField?.focus({ preventScroll: true });
-        });
-      });
+      el.openCheckout?.addEventListener("click", handleOpenCheckoutClick);
 
       el.checkoutForm?.addEventListener("submit", submitOrder);
       bindPostalCodeInput();
 
-      el.whatsappInfo?.addEventListener("click", () => {
-        if (isCompletedOrderReady(state.completedOrder)) {
-          const whatsappMessage = buildWhatsAppOrderMessage(state.completedOrder);
-
-          console.log("[WHATSAPP]", {
-            orderNumber: state.completedOrder.orderNumber,
-            itemCount: state.completedOrder.items.length,
-            buyerName: state.completedOrder.buyer?.name,
-            messageLength: whatsappMessage.length
-          });
-
-          openWhatsAppWithMessage(whatsappMessage);
-          return;
-        }
-
-        if (!el.checkoutForm?.reportValidity()) {
-          return;
-        }
-
-        if (!validatePostalCodeField()) {
-          return;
-        }
-
-        const whatsappMessage = buildWhatsAppMessageFromCheckout();
-
-        if (!whatsappMessage) {
-          setMessage("La lista está vacía.");
-          return;
-        }
-
-        openWhatsAppWithMessage(whatsappMessage);
-      });
+      el.whatsappInfo?.addEventListener("click", handleCheckoutWhatsAppClick);
+      el.successWhatsapp?.addEventListener("click", handleSuccessWhatsAppClick);
 
       updateWhatsAppButton();
       updateDevWhatsAppTestVisibility();
@@ -584,6 +896,7 @@
         hideStatus();
         renderProducts();
         renderCart();
+        closeAllModals();
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         console.error("[MSC catalog] product loading failed:", {
@@ -720,6 +1033,7 @@
       state.products.forEach((product) => {
         const card = document.createElement("article");
         card.className = "msc-product-card";
+        card.dataset.mscProductId = product.id;
 
         const button = document.createElement("button");
         button.type = "button";
@@ -799,6 +1113,11 @@
     /* ==================================================
        PRODUCT MODAL
        ================================================== */
+    function resetModalScroll(target) {
+      if (!target) return;
+      target.scrollTop = 0;
+    }
+
     function openProduct(product) {
       state.selectedProduct = product;
       state.selectedQuantity = 1;
@@ -823,9 +1142,20 @@
       }
 
       el.addCart.disabled = !product.available;
-      el.addCart.textContent = product.available ? "Agregar a la lista" : "Producto no disponible";
+      el.addCart.textContent = product.available
+        ? "Agregar a la lista"
+        : "Producto no disponible";
+      el.addCart.setAttribute(
+        "aria-label",
+        product.available
+          ? "Agregar a la lista"
+          : "Producto no disponible",
+      );
       updateModalQuantity();
       showLayer(el.productModal);
+      requestAnimationFrame(() => {
+        resetModalScroll(el.productDialog);
+      });
     }
 
     function closeProduct() {
@@ -940,7 +1270,9 @@
       const totalQuantity = state.cart.reduce((sum, item) => sum + item.quantity, 0);
       const totalPrice = state.cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
-      el.cartCount.textContent = String(totalQuantity);
+      if (el.cartCount) {
+        el.cartCount.textContent = String(totalQuantity);
+      }
       el.cartTotal.textContent = formatMoney(totalPrice);
       el.openCheckout.disabled = state.cart.length === 0;
 
@@ -985,33 +1317,6 @@
         const actions = document.createElement("div");
         actions.className = "msc-cart-item-actions";
 
-        const quantity = document.createElement("div");
-        quantity.className = "msc-cart-quantity";
-
-        const minus = document.createElement("button");
-        minus.type = "button";
-        minus.textContent = "−";
-
-        const value = document.createElement("span");
-        value.textContent = String(item.quantity);
-
-        const plus = document.createElement("button");
-        plus.type = "button";
-        plus.textContent = "+";
-
-        minus.addEventListener("click", () => {
-          item.quantity -= 1;
-          if (item.quantity <= 0) state.cart = state.cart.filter((cartItem) => cartItem !== item);
-          renderCart();
-        });
-
-        plus.addEventListener("click", () => {
-          item.quantity += 1;
-          renderCart();
-        });
-
-        quantity.append(minus, value, plus);
-
         const remove = document.createElement("button");
         remove.type = "button";
         remove.className = "msc-cart-remove";
@@ -1021,7 +1326,7 @@
           renderCart();
         });
 
-        actions.append(quantity, remove);
+        actions.append(remove);
         content.append(name, price, actions);
         row.appendChild(content);
         el.cartItems.appendChild(row);
@@ -1034,38 +1339,61 @@
        CART INTERACTIONS
        ================================================== */
     function openCart() {
+      hideLayer(el.checkoutModal);
       renderCart();
       showLayer(el.cartDrawer);
+      requestAnimationFrame(() => {
+        resetModalScroll(el.cartBody);
+      });
     }
 
     function closeCart() {
       hideLayer(el.cartDrawer);
     }
 
+    function openCheckout() {
+      if (!state.cart.length) return;
+
+      closeCart();
+      state.completedOrder = null;
+      showCheckoutFormView();
+      renderCheckout();
+
+      if (el.checkoutInner) {
+        el.checkoutInner.scrollTop = 0;
+      }
+
+      showLayer(el.checkoutModal);
+      updateWhatsAppButton();
+
+      requestAnimationFrame(() => {
+        resetModalScroll(el.checkoutFormPanel);
+
+        const firstField = el.checkoutForm?.querySelector('input[name="name"]');
+        firstField?.focus({ preventScroll: true });
+      });
+    }
+
     /* ==================================================
        CHECKOUT RENDERING
        ================================================== */
     function renderCheckout() {
-      el.checkoutItems.innerHTML = "";
+      if (el.checkoutItems) {
+        el.checkoutItems.innerHTML = "";
+      }
 
-      state.cart.forEach((item) => {
-        const row = document.createElement("div");
-        row.className = "msc-order-item";
-
-        const label = document.createElement("span");
-        label.textContent = `${item.product.title} × ${item.quantity}`;
-
-        const amount = document.createElement("strong");
-        amount.textContent = formatMoney(item.product.price * item.quantity);
-
-        row.append(label, amount);
-        el.checkoutItems.appendChild(row);
-      });
-
-      el.checkoutTotal.textContent = formatMoney(getCartTotal());
+      if (el.checkoutTotal) {
+        el.checkoutTotal.textContent = formatMoney(getCartTotal());
+      }
     }
 
     function closeCheckout() {
+      if (isCheckoutSuccessVisible()) {
+        handleSuccessModalClose();
+        return;
+      }
+
+      showCheckoutFormView();
       hideLayer(el.checkoutModal);
       setMessage("");
       updateWhatsAppButton();
@@ -1076,6 +1404,8 @@
        ================================================== */
     async function submitOrder(event) {
       event.preventDefault();
+
+      if (state.isSubmitting) return;
 
       if (!state.cart.length) {
         setMessage("La lista está vacía.");
@@ -1094,6 +1424,8 @@
         return;
       }
 
+      console.log("[EMAIL] submit started");
+
       if (isDevCatalog) {
         console.log("[ORDER DEBUG]", {
           buyer: orderSnapshot.buyer,
@@ -1102,12 +1434,17 @@
         });
       }
 
+      state.isSubmitting = true;
       setSubmitting(true);
       setMessage("");
+      showCheckoutFormView();
 
-      console.log("[ORDER] Sending request", {
-        endpoint: orderUrl,
-        itemCount: orderSnapshot.items.length
+      console.log("[EMAIL] payload", {
+        buyer: orderSnapshot.buyer,
+        itemCount: orderSnapshot.items.length,
+        subtotal: orderSnapshot.subtotal,
+        total: orderSnapshot.total,
+        currency: orderSnapshot.currency
       });
 
       try {
@@ -1118,10 +1455,7 @@
           body: JSON.stringify(orderSnapshot)
         });
 
-        console.log("[ORDER] Response", {
-          status: response.status,
-          contentType: response.headers.get("content-type")
-        });
+        console.log("[EMAIL] response status", response.status);
 
         const responseText = await response.text();
         let result = {};
@@ -1135,6 +1469,8 @@
           });
           throw new Error(`NON_JSON_RESPONSE_${response.status}`);
         }
+
+        console.log("[EMAIL] response body", result);
 
         if (!response.ok || !result.ok) {
           console.error("[ORDER] Request failed", {
@@ -1153,27 +1489,14 @@
         };
 
         state.completedOrder = completedOrderData;
-
-        state.cart = [];
-        saveCart();
-        renderCart();
-        el.checkoutForm.reset();
-
-        setSubmitting(false);
-
-        if (orderNumber) {
-          setMessage(
-            `Pedido enviado correctamente.\nNúmero de pedido: ${orderNumber}`,
-            true
-          );
-        } else {
-          setMessage("Pedido enviado correctamente.", true);
-        }
-
+        showCheckoutSuccessView(orderNumber);
         updateWhatsAppButton();
       } catch (error) {
-        console.error("[ORDER] Request failed", error);
+        console.error("[EMAIL] failed", error);
+        showCheckoutFormView();
         setMessage("No se pudo enviar el pedido. Inténtalo nuevamente.");
+      } finally {
+        state.isSubmitting = false;
         setSubmitting(false);
       }
     }
@@ -1200,16 +1523,19 @@
        ================================================== */
     function showLayer(element) {
       if (!element) return;
+      updateMobileHeaderHeight();
       element.hidden = false;
       element.setAttribute("aria-hidden", "false");
+      syncModalLayerDisplay(element, true);
       document.documentElement.classList.add("msc-lock");
       document.body.classList.add("msc-lock");
     }
 
     function hideLayer(element) {
-      if (!element || element.hidden) return;
+      if (!element) return;
       element.hidden = true;
       element.setAttribute("aria-hidden", "true");
+      syncModalLayerDisplay(element, false);
 
       const anyOpen = Array.from(
         document.querySelectorAll("[data-msc-product-modal], [data-msc-cart-drawer], [data-msc-checkout-modal]")
@@ -1285,9 +1611,22 @@
 
     loadProducts();
 
+    const syncMobileLayout = () => {
+      updateMobileHeaderHeight();
+      updateDevToolbarOffset();
+      placeListaButton(root, listaBtn);
+    };
+
+    window.addEventListener("resize", syncMobileLayout, { passive: true });
+    window.addEventListener("orientationchange", syncMobileLayout, { passive: true });
+    window.addEventListener("load", syncMobileLayout, { once: true });
+
     try {
       bindEvents();
+      closeAllModals();
       updateWhatsAppButton();
+      syncMobileLayout();
+      applyThemeHeaderLogo(headerLogoUrl);
     } catch (initError) {
       console.error("[MSC catalog] non-blocking init error:", initError);
     }

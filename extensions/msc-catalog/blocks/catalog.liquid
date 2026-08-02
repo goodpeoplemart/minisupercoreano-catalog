@@ -49,7 +49,39 @@ ASSET LOADING (CSS)
     display: none !important;
   }
 
+  /* Keep theme header visible and stuck at top while scrolling */
+  body:has(.msc-catalog) sticky-header,
+  body:has(.msc-catalog) .header-wrapper,
+  body:has(.msc-catalog) .section-header,
+  body:has(.msc-catalog) .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    width: 100%;
+    isolation: isolate;
+    transform: none !important;
+    overflow: visible;
+    background: var(--gradient-background, rgb(var(--color-background, 255 255 255)));
+  }
+
+  body:has(.msc-catalog) sticky-header.shopify-section-header-hidden,
+  body:has(.msc-catalog) .shopify-section-header-hidden {
+    transform: none !important;
+    top: 0 !important;
+  }
+
+  body:has(.msc-catalog) .shopify-section-group-header-group {
+    overflow: visible;
+  }
+
   body:has(.msc-catalog) .header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    width: 100%;
+    isolation: isolate;
+    transform: none !important;
+    background: var(--gradient-background, rgb(var(--color-background, 255 255 255)));
     grid-template-areas: "heading icons" !important;
     grid-template-columns: minmax(0, 1fr) auto !important;
     column-gap: 1.5rem;
@@ -59,6 +91,36 @@ ASSET LOADING (CSS)
   body:has(.msc-catalog) .header__heading,
   body:has(.msc-catalog) .header__heading-link {
     justify-self: start;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  body:has(.msc-catalog) .header__heading-link {
+    display: inline-flex;
+    align-items: center;
+    line-height: 0;
+  }
+
+  body:has(.msc-catalog) .header__icons .header__icon--cart,
+  body:has(.msc-catalog) .header__icons #cart-icon-bubble,
+  body:has(.msc-catalog) .header__icons cart-drawer,
+  body:has(.msc-catalog) .header__icons .cart-count-bubble {
+    display: none !important;
+  }
+
+  body:has(.msc-catalog) .header__icons {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    gap: 6px;
+    overflow: visible;
+  }
+
+  body:has(.msc-catalog) .header [data-msc-open-cart],
+  body:has(.msc-catalog) sticky-header [data-msc-open-cart],
+  body:has(.msc-catalog) .header-wrapper [data-msc-open-cart] {
+    display: none !important;
   }
 
   @media screen and (max-width: 749px) {
@@ -83,28 +145,10 @@ CATALOG ROOT CONTAINER AND APP PROXY CONFIGURATION
   data-click-url="/apps/msc/click"
   data-currency="{{ shop.currency | default: 'MXN' | escape }}"
   data-seller-whatsapp="{{ block.settings.whatsapp_number | default: '525633244119' | escape }}"
+  data-header-logo-url="{{ 'minisupercoreano-logo.png' | asset_url }}"
+  data-cart-label="{{ block.settings.cart_label | default: 'Lista' | escape }}"
 >
   <div class="msc-container">
-    {%- comment -%}
-    ==================================================
-    HEADER
-    ==================================================
-    {%- endcomment -%}
-    <header class="msc-header">
-      <div>
-        <h2 class="msc-title">{{ block.settings.heading | default: 'Productos' | escape }}</h2>
-        {% if block.settings.subheading != blank %}
-          <p class="msc-subtitle">{{ block.settings.subheading | escape }}</p>
-        {% endif %}
-      </div>
-
-      <button type="button" class="msc-list-button" data-msc-open-cart aria-label="Abrir lista de compra">
-        <span aria-hidden="true">🛒</span>
-        <span>{{ block.settings.cart_label | default: 'Lista' | escape }}</span>
-        <span class="msc-list-count" data-msc-cart-count>0</span>
-      </button>
-    </header>
-
     {%- comment -%}
     ==================================================
     LOADING AND STATUS STATE
@@ -201,6 +245,7 @@ CATALOG ROOT CONTAINER AND APP PROXY CONFIGURATION
       </header>
 
       <div class="msc-modal-body msc-checkout-inner">
+        <div class="msc-checkout-form-panel" data-msc-checkout-form-panel>
         <form class="msc-checkout-form" data-msc-checkout-form>
           <div class="msc-form-grid">
             <div class="msc-field">
@@ -322,9 +367,31 @@ CATALOG ROOT CONTAINER AND APP PROXY CONFIGURATION
             Probar mensaje de WhatsApp
           </button>
         </form>
+        </div>
+
+        <div
+          class="msc-order-success-panel"
+          data-msc-success-modal
+          hidden
+          aria-hidden="true"
+        >
+          <div class="msc-order-success-dialog">
+            <p class="msc-order-success-message" data-msc-success-message></p>
+            <p class="msc-form-message" data-msc-success-error hidden></p>
+            <button type="button" class="msc-whatsapp-button" data-msc-success-whatsapp>
+              Enviar por WhatsApp
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   </div>
+
+  <button type="button" class="msc-list-button" data-msc-open-cart aria-label="Abrir lista de compra">
+    <span aria-hidden="true">🛒</span>
+    <span>{{ block.settings.cart_label | default: 'Lista' | escape }}</span>
+    <span class="msc-list-count" data-msc-cart-count>0</span>
+  </button>
 </div>
 
 {%- comment -%}

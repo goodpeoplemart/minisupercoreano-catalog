@@ -154,10 +154,11 @@ export async function action({ request }) {
 
   const orderedAt = formatOrderDateTime();
   const verifiedSubtotal = calculateVerifiedTotal(verifiedItems);
-  const orderSubtotal = Number.isFinite(Number(subtotal))
-    ? Number(subtotal)
-    : verifiedSubtotal;
-  const orderTotal = Number.isFinite(Number(total)) ? Number(total) : verifiedSubtotal;
+  const orderTotal = Number.isFinite(Number(total))
+    ? Number(total)
+    : Number.isFinite(Number(subtotal))
+      ? Number(subtotal)
+      : verifiedSubtotal;
   const totalQuantity = verifiedItems.reduce(
     (sum, item) => sum + item.quantity,
     0,
@@ -476,10 +477,7 @@ async function sendOptionalWebhook(payload) {
         "Content-Type": "application/json",
         "X-MSC-Webhook-Secret": secret,
       },
-      body: JSON.stringify({
-        ...payload,
-        webhookSecret: secret,
-      }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(8000),
     });
 
