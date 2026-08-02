@@ -46,7 +46,7 @@ api_version = "2026-10"
 
 [auth]
 redirect_urls = [
-  "https://minisupercoreano-catalog-production.up.railway.app/api/auth"
+  "https://minisupercoreano-catalog-production.up.railway.app/auth/callback"
 ]
 
 [build]
