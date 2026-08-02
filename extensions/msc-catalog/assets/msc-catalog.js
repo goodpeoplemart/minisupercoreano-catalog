@@ -805,6 +805,8 @@
       state.isLoadingProducts = true;
       setStatus("Cargando productos...", false);
 
+      let phase = "fetch";
+
       try {
         if (!el.grid) {
           throw new Error("Product grid element not found.");
@@ -832,12 +834,15 @@
         const rawText = await response.text();
         let payload = null;
 
+        phase = "parse";
+
         console.log("[MSC catalog] products HTTP response", {
           url: productsUrl,
           status: response.status,
           ok: response.ok,
           contentType: response.headers.get("content-type") || "",
-          bodyPreview: rawText.slice(0, 160)
+          bodyPreview: rawText.slice(0, 160),
+          looksLikeHtml: rawText.trim().startsWith("<")
         });
 
         if (rawText.trim().startsWith("<")) {
@@ -849,13 +854,20 @@
         try {
           payload = rawText ? JSON.parse(rawText) : null;
         } catch (parseError) {
-          console.error("[MSC catalog] invalid JSON payload:", parseError, rawText);
+          console.error("[MSC catalog] invalid JSON payload:", parseError, rawText.slice(0, 200));
           throw new Error(`HTTP ${response.status}: invalid JSON response.`);
         }
+
+        phase = "validate";
+
+        const hasProductsArray = Array.isArray(payload?.products);
 
         if (!response.ok || payload?.ok === false) {
           console.error("[MSC catalog] products API error:", {
             status: response.status,
+            responseOk: response.ok,
+            payloadOk: payload?.ok,
+            hasProductsArray,
             payload
           });
           throw new Error(
@@ -865,13 +877,15 @@
           );
         }
 
+        phase = "extract";
+
         const extracted = extractProducts(payload);
 
         console.log("[MSC catalog] extracted products", {
           count: extracted.length,
-          shape: Array.isArray(payload?.products)
+          shape: hasProductsArray
             ? "payload.products"
-            : payload?.data?.products
+            : Array.isArray(payload?.data?.products)
               ? "payload.data.products"
               : "unknown"
         });
@@ -882,24 +896,39 @@
           return;
         }
 
-        state.products = extracted
+        phase = "normalize";
+
+        const normalized = extracted
           .map(normalizeProduct)
           .filter((product) => product.id && product.title);
 
-        if (!state.products.length) {
-          console.warn("[MSC catalog] normalized product list empty:", payload);
+        if (!normalized.length) {
+          console.error("[MSC catalog] normalize dropped all products:", {
+            sample: extracted[0]
+          });
           setStatus("No hay productos publicados disponibles.", false);
           return;
         }
 
+        state.products = normalized;
+
+        phase = "render";
+
         restoreCart();
         hideStatus();
         renderProducts();
-        renderCart();
+
+        try {
+          renderCart();
+        } catch (cartRenderError) {
+          console.error("[MSC catalog] cart render failed after products loaded:", cartRenderError);
+        }
+
         closeAllModals();
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         console.error("[MSC catalog] product loading failed:", {
+          phase,
           productsUrl,
           detail,
           error
@@ -1266,6 +1295,11 @@
        CART RENDERING
        ================================================== */
     function renderCart() {
+      if (!el.cartItems || !el.cartTotal || !el.openCheckout || !el.cartEmpty) {
+        console.warn("[MSC catalog] cart DOM incomplete, skipping cart render");
+        return;
+      }
+
       el.cartItems.innerHTML = "";
       const totalQuantity = state.cart.reduce((sum, item) => sum + item.quantity, 0);
       const totalPrice = state.cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
